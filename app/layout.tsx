@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Manrope } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { QueryProvider } from '@/lib/query-provider'
 import { AppProvider } from '@/lib/store'
 import './globals.css'
 
@@ -30,9 +31,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${manrope.variable} font-sans antialiased`}>
-        <AppProvider>
-          {children}
-        </AppProvider>
+        <QueryProvider>
+          <AppProvider>
+            {children}
+          </AppProvider>
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

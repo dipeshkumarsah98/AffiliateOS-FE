@@ -24,9 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      {/* Offset for desktop sidebar */}
       <main className="flex-1 lg:ml-60 flex flex-col min-h-screen min-w-0">
-        {/* Pass toggle to children via a context-free approach — topbar reads from window event */}
         <div
           className="lg:hidden fixed top-3.5 left-4 z-30"
         >

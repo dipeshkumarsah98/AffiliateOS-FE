@@ -115,7 +115,6 @@ function RecentOrderRow({ order }: { order: Order }) {
   )
 }
 
-// ---- Admin Dashboard ----
 function AdminDashboard() {
   const totalOrders = DUMMY_ORDERS.length
   const totalRevenue = DUMMY_ORDERS.filter(o => o.status === 'completed').reduce((s, o) => s + o.total, 0)

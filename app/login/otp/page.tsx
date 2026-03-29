@@ -3,17 +3,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '@/lib/store'
+import { useSendOtpMutation, useVerifyOtpMutation } from '@/hooks/use-auth'
+import { getApiErrorMessage } from '@/lib/api/client'
 import { Layers, ArrowRight, RefreshCw, ChevronLeft, CheckCircle2, Zap, Shield } from 'lucide-react'
 import Link from 'next/link'
 
 export default function OtpPage() {
-  const { pendingEmail, verifyOtp, login } = useApp()
+  const { pendingEmail } = useApp()
   const router = useRouter()
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
   const [countdown, setCountdown] = useState(30)
-  const [resending, setResending] = useState(false)
+  const verifyOtpMutation = useVerifyOtpMutation()
+  const resendOtpMutation = useSendOtpMutation()
   const inputs = useRef<(HTMLInputElement | null)[]>([])
 
   const hasRedirected = useRef(false)
@@ -57,29 +59,30 @@ export default function OtpPage() {
     e?.preventDefault()
     const code = otp.join('')
     if (code.length < 6) { setError('Please enter all 6 digits.'); return }
-    setLoading(true)
-    await new Promise(r => setTimeout(r, 600))
-    const ok = verifyOtp(code)
-    setLoading(false)
-    if (ok) {
+
+    try {
+      await verifyOtpMutation.mutateAsync(code)
       hasRedirected.current = true
       router.push('/dashboard')
-    } else {
-      setError('Invalid OTP. For demo, use any 6-digit code.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Invalid OTP. Please try again.'))
       setOtp(['', '', '', '', '', ''])
       inputs.current[0]?.focus()
     }
-  }, [otp, verifyOtp, router])
+  }, [otp, verifyOtpMutation, router])
 
   const handleResend = async () => {
     if (countdown > 0 || !pendingEmail) return
-    setResending(true)
-    await login(pendingEmail)
-    setResending(false)
-    setCountdown(30)
-    setOtp(['', '', '', '', '', ''])
-    setError('')
-    inputs.current[0]?.focus()
+
+    try {
+      await resendOtpMutation.mutateAsync(pendingEmail)
+      setCountdown(30)
+      setOtp(['', '', '', '', '', ''])
+      setError('')
+      inputs.current[0]?.focus()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Unable to resend OTP. Please try again.'))
+    }
   }
 
   if (!pendingEmail) return null
@@ -126,7 +129,7 @@ export default function OtpPage() {
               { icon: CheckCircle2, text: 'Affiliate link management & commissions' },
             ].map((f) => (
               <div key={f.text} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
                   <f.icon className="w-3.5 h-3.5 text-white" />
                 </div>
                 <span className="text-blue-100 text-sm">{f.text}</span>
@@ -228,11 +231,11 @@ export default function OtpPage() {
 
             <button
               type="submit"
-              disabled={loading || otp.join('').length < 6}
+              disabled={verifyOtpMutation.isPending || otp.join('').length < 6}
               className="w-full py-3 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
               style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
             >
-              {loading ? (
+              {verifyOtpMutation.isPending ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
@@ -250,15 +253,15 @@ export default function OtpPage() {
             </p>
             <button
               onClick={handleResend}
-              disabled={countdown > 0 || resending}
+              disabled={countdown > 0 || resendOtpMutation.isPending}
               className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium transition-opacity disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               style={{ color: countdown > 0 ? 'var(--on-surface-variant)' : 'var(--primary)' }}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${resendOtpMutation.isPending ? 'animate-spin' : ''}`} />
               {countdown > 0 ? `Resend in ${countdown}s` : 'Resend code'}
             </button>
             <p className="text-xs mt-4" style={{ color: 'var(--on-surface-variant)' }}>
-              For demo, use any 6-digit code.
+              Enter the 6-digit code sent to your email.
             </p>
           </div>
         </div>

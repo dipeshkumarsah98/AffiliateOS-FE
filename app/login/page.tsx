@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApp } from '@/lib/store'
+import { useSendOtpMutation } from '@/hooks/use-auth'
+import { getApiErrorMessage } from '@/lib/api/client'
 import { Layers, ArrowRight, CheckCircle2, Zap, Shield } from 'lucide-react'
 
 const DEMO_ACCOUNTS = [
@@ -12,23 +13,21 @@ const DEMO_ACCOUNTS = [
 ]
 
 export default function LoginPage() {
-  const { login } = useApp()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const sendOtpMutation = useSendOtpMutation()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!email.trim()) { setError('Please enter your email address.'); return }
-    setLoading(true)
-    const ok = await login(email.trim())
-    setLoading(false)
-    if (ok) {
+
+    try {
+      await sendOtpMutation.mutateAsync(email.trim())
       router.push('/login/otp')
-    } else {
-      setError('No account found with that email. Try a demo account below.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Unable to send OTP. Please check your email and try again.'))
     }
   }
 
@@ -38,17 +37,14 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--surface)' }}>
-      {/* Left panel — branding */}
       <div
         className="hidden lg:flex lg:w-[52%] flex-col justify-between p-12 relative overflow-hidden"
         style={{ background: 'linear-gradient(145deg, #1a3299 0%, #2b4bb9 40%, #4865d3 100%)' }}
       >
-        {/* Background texture */}
         <div className="absolute inset-0 opacity-10" style={{
           backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.2) 0%, transparent 50%)',
         }} />
 
-        {/* Logo */}
         <div className="relative flex items-center gap-3 z-10">
           <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
             <Layers className="w-5 h-5 text-white" />
@@ -58,7 +54,6 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* Main copy */}
         <div className="relative z-10 space-y-6">
           <div>
             <h2 className="text-5xl font-bold text-white leading-tight mb-4" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.03em' }}>
@@ -70,7 +65,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Feature list */}
           <div className="space-y-3">
             {[
               { icon: Zap, text: 'Real-time order tracking & status updates' },
@@ -78,7 +72,7 @@ export default function LoginPage() {
               { icon: CheckCircle2, text: 'Affiliate link management & commissions' },
             ].map((f) => (
               <div key={f.text} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
                   <f.icon className="w-3.5 h-3.5 text-white" />
                 </div>
                 <span className="text-blue-100 text-sm">{f.text}</span>
@@ -156,11 +150,11 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={sendOtpMutation.isPending}
               className="w-full py-3 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
               style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
             >
-              {loading ? (
+              {sendOtpMutation.isPending ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
@@ -185,7 +179,7 @@ export default function LoginPage() {
                   style={{ background: 'var(--surface-container-low)' }}
                 >
                   <span
-                    className="px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0"
+                    className="px-2 py-0.5 rounded-full text-xs font-semibold shrink-0"
                     style={{ background: acct.color, color: acct.textColor }}
                   >
                     {acct.label}

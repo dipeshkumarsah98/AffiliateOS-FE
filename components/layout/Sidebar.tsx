@@ -56,7 +56,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   const content = (
     <div className="flex flex-col h-full">
-      {/* Logo row */}
       <div className="px-6 py-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
@@ -77,7 +76,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </p>
           </div>
         </div>
-        {/* Close button — mobile only */}
         {onClose && (
           <button
             onClick={onClose}
@@ -150,7 +148,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop sidebar — always visible on lg+ */}
       <aside
         className="hidden lg:flex fixed left-0 top-0 h-screen w-60 flex-col z-30"
         style={{ background: 'var(--surface-container-low)' }}
