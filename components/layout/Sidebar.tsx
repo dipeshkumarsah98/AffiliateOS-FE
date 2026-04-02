@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import {
   LayoutDashboard,
   Package,
@@ -47,7 +47,7 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const roles = currentUser?.roles ?? []
 
   const visibleItems = NAV_ITEMS.filter(item =>

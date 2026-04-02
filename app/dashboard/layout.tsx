@@ -2,21 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Sidebar } from '@/components/layout/Sidebar'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
+  const hasHydrated = useAuthStore((s) => s._hasHydrated)
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
-    if (!currentUser) {
+    if (hasHydrated && !currentUser) {
       router.replace('/login')
     }
-  }, [currentUser, router])
+  }, [currentUser, hasHydrated, router])
 
-  if (!currentUser) return null
+  if (!hasHydrated || !currentUser) return null
 
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--surface)' }}>

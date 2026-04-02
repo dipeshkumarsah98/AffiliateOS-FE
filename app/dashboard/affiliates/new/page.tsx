@@ -1,31 +1,38 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
+import * as z from 'zod'
 import {
     ArrowLeft,
     Building2,
-    Check,
+    CheckCircle2,
     ChevronRight,
+    Link2,
     RefreshCw,
     Search,
     User,
 } from 'lucide-react'
-import { Topbar } from '@/components/layout/Topbar'
-import { useApp } from '@/lib/store'
-import { DUMMY_AFFILIATES, DUMMY_PRODUCTS } from '@/lib/dummy-data'
-import type { AffiliateFormData } from '@/lib/affiliate-form-store'
-import {
-    generateAffiliateCode,
-    loadFormDraft,
-    saveFormDraft,
-} from '@/lib/affiliate-form-store'
+
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card'
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
     Select,
     SelectContent,
@@ -34,6 +41,50 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Spinner } from '@/components/ui/spinner'
+import { Topbar } from '@/components/layout/Topbar'
+import { useAuthStore } from '@/stores/auth-store'
+import { useProductsQuery } from '@/hooks/use-products'
+import { DUMMY_AFFILIATES } from '@/lib/dummy-data'
+import type { AffiliateFormData } from '@/lib/affiliate-form-store'
+import {
+    generateAffiliateCode,
+    loadFormDraft,
+    saveFormDraft,
+} from '@/lib/affiliate-form-store'
+import { Label } from '@/components/ui/label'
+
+// Validation schema
+const affiliateFormSchema = z.object({
+    fullName: z.string().min(1, 'Full name is required'),
+    email: z.string().email('Enter a valid email address'),
+    affiliateType: z.enum(['influencer', 'creator', 'shop_owner', 'blogger', 'other']),
+    contactNumber: z.string(),
+    physicalAddress: z.string(),
+    selectedProductIds: z.array(z.string()),
+    affiliateCode: z.string().min(1, 'Affiliate code is required'),
+    discountType: z.enum(['fixed', 'percentage']),
+    discountValue: z.string().refine(
+        (val) => {
+            const num = Number(val)
+            return !isNaN(num) && num >= 0
+        },
+        { message: 'Must be a valid number >= 0' }
+    ),
+    commissionType: z.enum(['fixed', 'percentage']),
+    commissionValue: z.string().refine(
+        (val) => {
+            const num = Number(val)
+            return !isNaN(num) && num >= 0
+        },
+        { message: 'Must be a valid number >= 0' }
+    ),
+    bankName: z.string(),
+    accountNumber: z.string(),
+    editId: z.string().optional(),
+})
+
+type FormValues = z.infer<typeof affiliateFormSchema>
 
 function toNonNegativeString(value: string) {
     if (value === '') return ''
@@ -42,148 +93,29 @@ function toNonNegativeString(value: string) {
     return String(Math.max(0, parsed))
 }
 
-function Field({
-    label,
-    required,
-    error,
-    children,
-}: {
-    label: string
-    required?: boolean
-    error?: string
-    children: React.ReactNode
-}) {
-    return (
-        <div>
-            <Label
-                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: 'var(--on-surface-variant)' }}
-            >
-                {label}
-                {required ? (
-                    <span className="ml-0.5" style={{ color: 'var(--error)' }}>
-                        *
-                    </span>
-                ) : null}
-            </Label>
-            {children}
-            {error ? (
-                <p className="mt-1 text-xs" style={{ color: 'var(--error)' }}>
-                    {error}
-                </p>
-            ) : null}
-        </div>
-    )
-}
-
-function StyledInput({
-    error,
-    className,
-    ...props
-}: React.ComponentProps<typeof Input> & { error?: boolean }) {
-    return (
-        <Input
-            {...props}
-            className={`w-full px-4 py-3 rounded-lg text-sm h-auto shadow-none transition-all ${className ?? ''}`}
-            style={{
-                background: 'var(--surface-container-low)',
-                color: 'var(--on-surface)',
-                border: error ? '2px solid var(--error)' : '2px solid transparent',
-            }}
-            onFocus={(e) => {
-                e.currentTarget.style.border = error
-                    ? '2px solid var(--error)'
-                    : '2px solid rgba(43,75,185,0.4)'
-                e.currentTarget.style.background = 'var(--surface-container-lowest)'
-            }}
-            onBlur={(e) => {
-                e.currentTarget.style.border = error
-                    ? '2px solid var(--error)'
-                    : '2px solid transparent'
-                e.currentTarget.style.background = 'var(--surface-container-low)'
-            }}
-        />
-    )
-}
-
-function SectionCard({
-    icon,
-    iconBg,
-    iconColor,
-    title,
-    subtitle,
-    children,
-}: {
-    icon: React.ReactNode
-    iconBg: string
-    iconColor: string
-    title: string
-    subtitle: string
-    children: React.ReactNode
-}) {
-    return (
-        <Card
-            className="rounded-2xl py-0"
-            style={{
-                background: 'var(--surface-container-lowest)',
-                boxShadow: '0 4px 24px rgba(19,27,46,0.04)',
-                borderColor: 'transparent',
-            }}
-        >
-            <CardHeader
-                className="px-8 pt-8 pb-4"
-                style={{ borderBottom: '1px solid rgba(195,197,220,0.15)' }}
-            >
-                <div className="flex items-center gap-3">
-                    <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: iconBg }}
-                    >
-                        <span style={{ color: iconColor }}>{icon}</span>
-                    </div>
-                    <div>
-                        <CardTitle
-                            className="text-base font-bold"
-                            style={{
-                                fontFamily: 'var(--font-display)',
-                                color: 'var(--on-surface)',
-                                letterSpacing: '-0.02em',
-                            }}
-                        >
-                            {title}
-                        </CardTitle>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--on-surface-variant)' }}>
-                            {subtitle}
-                        </p>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="px-8 pb-8 pt-5 space-y-5">{children}</CardContent>
-        </Card>
-    )
-}
-
 export default function NewAffiliatePage() {
-    const { currentUser } = useApp()
+    const currentUser = useAuthStore((s) => s.currentUser)
     const router = useRouter()
     const searchParams = useSearchParams()
     const editId = searchParams.get('editId')
 
     const [productSearch, setProductSearch] = useState('')
 
+    // Fetch products from backend
+    const productsQuery = useProductsQuery({
+        page: 1,
+        limit: 1000, // Fetch all products for selection
+        search: productSearch.trim() || undefined,
+    })
+
     const existingAffiliate = editId
         ? DUMMY_AFFILIATES.find((a) => a.id === editId)
         : null
     const isEdit = Boolean(existingAffiliate)
 
-    const {
-        register,
-        handleSubmit,
-        control,
-        watch,
-        setValue,
-        formState: { errors },
-    } = useForm<AffiliateFormData>({
+    // Initialize form with default values
+    const form = useForm<FormValues>({
+        resolver: zodResolver(affiliateFormSchema),
         defaultValues: (() => {
             const draft = loadFormDraft()
             if (draft && draft.editId === editId) return draft
@@ -210,14 +142,14 @@ export default function NewAffiliatePage() {
             return {
                 fullName: '',
                 email: '',
-                affiliateType: 'influencer',
+                affiliateType: 'influencer' as const,
                 contactNumber: '',
                 physicalAddress: '',
                 selectedProductIds: [],
                 affiliateCode: '',
-                discountType: 'fixed',
+                discountType: 'fixed' as const,
                 discountValue: '0.00',
-                commissionType: 'percentage',
+                commissionType: 'percentage' as const,
                 commissionValue: '15',
                 bankName: '',
                 accountNumber: '',
@@ -226,10 +158,10 @@ export default function NewAffiliatePage() {
         })(),
     })
 
-    const fullName = watch('fullName')
-    const discountType = watch('discountType')
-    const commissionType = watch('commissionType')
-    const selectedProductIds = watch('selectedProductIds')
+    const fullName = form.watch('fullName')
+    const discountType = form.watch('discountType')
+    const commissionType = form.watch('commissionType')
+    const selectedProductIds = form.watch('selectedProductIds')
 
     useEffect(() => {
         if (currentUser && !currentUser.roles.includes('admin')) {
@@ -238,528 +170,500 @@ export default function NewAffiliatePage() {
     }, [currentUser, router])
 
     function regenerateCode() {
-        setValue('affiliateCode', generateAffiliateCode(fullName || 'PARTNER'), {
+        form.setValue('affiliateCode', generateAffiliateCode(fullName || 'PARTNER'), {
             shouldValidate: true,
         })
     }
 
     function toggleProduct(id: string) {
-        const current = selectedProductIds ?? []
-        if (current.includes(id)) {
-            setValue(
-                'selectedProductIds',
-                current.filter((p) => p !== id),
-                { shouldValidate: true },
-            )
-            return
-        }
+        if (typeof window !== 'undefined') {
 
-        setValue('selectedProductIds', [...current, id], { shouldValidate: true })
+            const current = selectedProductIds ?? []
+            if (current.includes(id)) {
+                form.setValue(
+                    'selectedProductIds',
+                    current.filter((p) => p !== id),
+                    { shouldValidate: true }
+                )
+                return
+            }
+
+            form.setValue('selectedProductIds', [...current, id], { shouldValidate: true })
+        }
     }
 
-    const filteredProducts = DUMMY_PRODUCTS.filter(
-        (p) => p.available && p.name.toLowerCase().includes(productSearch.toLowerCase()),
-    )
+    const products = productsQuery.data?.items ?? []
+    const isLoadingProducts = productsQuery.isLoading
+    const isSearchingProducts = productsQuery.isFetching && !productsQuery.isLoading
 
-    function onSubmit(data: AffiliateFormData) {
-        saveFormDraft({ ...data, editId: editId ?? undefined })
+    function onSubmit(data: FormValues) {
+        const formData: AffiliateFormData = {
+            ...data,
+            editId: editId ?? undefined,
+        }
+        saveFormDraft(formData)
         router.push('/dashboard/affiliates/new/review')
     }
 
     return (
-        <div className="flex flex-col min-h-screen" style={{ background: 'var(--surface)' }}>
+        <div className="flex flex-col min-h-screen bg-background">
             <Topbar title={isEdit ? 'Edit Affiliate' : 'New Affiliate'} />
 
             <main className="flex-1 p-6 lg:p-8 max-w-3xl mx-auto w-full">
-                <div className="flex items-center gap-2 text-xs mb-6" style={{ color: 'var(--on-surface-variant)' }}>
+                {/* Breadcrumb */}
+                <div className="flex items-center gap-2 text-xs mb-6 text-muted-foreground">
                     <Button
                         type="button"
                         variant="link"
                         onClick={() => router.push('/dashboard/affiliates')}
-                        className="h-auto p-0"
-                        style={{ color: 'var(--on-surface-variant)' }}
+                        className="h-auto p-0 text-muted-foreground"
                     >
                         Affiliates
                     </Button>
                     <ChevronRight className="w-3 h-3" />
-                    <span style={{ color: 'var(--primary)' }}>
+                    <span className="text-primary">
                         {isEdit ? 'Edit Affiliate' : 'Create New Affiliate'}
                     </span>
                 </div>
 
+                {/* Page Title */}
                 <div className="mb-8">
-                    <h1
-                        className="text-3xl font-bold"
-                        style={{
-                            fontFamily: 'var(--font-display)',
-                            color: 'var(--on-surface)',
-                            letterSpacing: '-0.02em',
-                        }}
-                    >
+                    <h1 className="text-3xl font-bold text-foreground">
                         {isEdit ? 'Edit Affiliate' : 'Register Affiliate'}
                     </h1>
-                    <p className="text-sm mt-1" style={{ color: 'var(--on-surface-variant)' }}>
+                    <p className="text-sm mt-1 text-muted-foreground">
                         {isEdit
                             ? 'Update partner profile and commission structure.'
                             : 'Configure a new partner profile and commission structure.'}
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    <SectionCard
-                        icon={<User className="w-5 h-5" />}
-                        iconBg="var(--primary-fixed)"
-                        iconColor="var(--on-primary-fixed)"
-                        title="Personal Details"
-                        subtitle="Identification and contact information."
-                    >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Full Name" required error={errors.fullName?.message}>
-                                <StyledInput
-                                    {...register('fullName', { required: 'Full name is required' })}
-                                    placeholder="e.g. Alexander Pierce"
-                                    error={Boolean(errors.fullName)}
-                                />
-                            </Field>
-                            <Field label="Email Address" required error={errors.email?.message}>
-                                <StyledInput
-                                    {...register('email', {
-                                        required: 'Email address is required',
-                                        pattern: {
-                                            value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                                            message: 'Enter a valid email address',
-                                        },
-                                    })}
-                                    type="email"
-                                    placeholder="alex@partnership.com"
-                                    error={Boolean(errors.email)}
-                                />
-                            </Field>
-                        </div>
+                {/* Form */}
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        {/* Personal Details Section */}
+                        <Card className="shadow-sm">
+                            <CardHeader className="border-b">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                        <User className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-base">Personal Details</CardTitle>
+                                        <CardDescription className="text-xs mt-0.5">
+                                            Identification and contact information.
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="fullName"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Full Name *</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. Ram Bahadur" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Affiliate Type">
-                                <Controller
-                                    name="affiliateType"
-                                    control={control}
+                                    <FormField
+                                        control={form.control}
+                                        name="email"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Email Address *</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        type="email"
+                                                        placeholder="ram@example.com.np"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="affiliateType"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Affiliate Type</FormLabel>
+                                                <Select value={field.value} onValueChange={field.onChange}>
+                                                    <FormControl>
+                                                        <SelectTrigger className="w-full">
+                                                            <SelectValue placeholder="Select affiliate type" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="influencer">Influencer</SelectItem>
+                                                        <SelectItem value="creator">Creator</SelectItem>
+                                                        <SelectItem value="shop_owner">Shop Owner</SelectItem>
+                                                        <SelectItem value="blogger">Blogger</SelectItem>
+                                                        <SelectItem value="other">Other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="contactNumber"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Contact Number</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="+977 9800000000" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                <FormField
+                                    control={form.control}
+                                    name="physicalAddress"
                                     render={({ field }) => (
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger
-                                                className="w-full h-auto px-4 py-3 rounded-lg text-sm"
-                                                style={{
-                                                    background: 'var(--surface-container-low)',
-                                                    color: 'var(--on-surface)',
-                                                    borderColor: 'transparent',
-                                                }}
-                                            >
-                                                <SelectValue placeholder="Select affiliate type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="influencer">Influencer</SelectItem>
-                                                <SelectItem value="creator">Creator</SelectItem>
-                                                <SelectItem value="shop_owner">Shop Owner</SelectItem>
-                                                <SelectItem value="blogger">Blogger</SelectItem>
-                                                <SelectItem value="other">Other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <FormItem>
+                                            <FormLabel>Physical Address</FormLabel>
+                                            <FormControl>
+                                                <Textarea
+                                                    rows={3}
+                                                    placeholder="Tinkune, Kathmandu, Nepal"
+                                                    className="resize-none"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
                                 />
-                            </Field>
-                            <Field label="Contact Number">
-                                <StyledInput
-                                    {...register('contactNumber')}
-                                    placeholder="+1 (555) 000-0000"
-                                />
-                            </Field>
-                        </div>
+                            </CardContent>
+                        </Card>
 
-                        <Field label="Physical Address">
-                            <Controller
-                                name="physicalAddress"
-                                control={control}
-                                render={({ field }) => (
-                                    <Textarea
-                                        {...field}
-                                        rows={3}
-                                        placeholder="Street, Suite, City, State, Zip"
-                                        className="w-full px-4 py-3 rounded-lg text-sm resize-none shadow-none"
-                                        style={{
-                                            background: 'var(--surface-container-low)',
-                                            color: 'var(--on-surface)',
-                                            border: '2px solid transparent',
-                                        }}
-                                        onFocus={(e) => {
-                                            e.currentTarget.style.border = '2px solid rgba(43,75,185,0.4)'
-                                            e.currentTarget.style.background = 'var(--surface-container-lowest)'
-                                        }}
-                                        onBlur={(e) => {
-                                            e.currentTarget.style.border = '2px solid transparent'
-                                            e.currentTarget.style.background = 'var(--surface-container-low)'
-                                        }}
-                                    />
-                                )}
-                            />
-                        </Field>
-                    </SectionCard>
-
-                    <SectionCard
-                        icon={
-                            <svg
-                                className="w-5 h-5"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                            </svg>
-                        }
-                        iconBg="#d1fae5"
-                        iconColor="#065f46"
-                        title="Affiliate Details"
-                        subtitle="Product linking and commercial terms."
-                    >
-                        <Field label="Product Selection">
-                            <div
-                                className="rounded-lg overflow-hidden"
-                                style={{
-                                    background: 'var(--surface-container-low)',
-                                    border: '2px solid transparent',
-                                }}
-                            >
-                                <div
-                                    className="flex items-center gap-2 px-3 py-2.5"
-                                    style={{ borderBottom: '1px solid rgba(195,197,220,0.2)' }}
-                                >
-                                    <Search
-                                        className="w-4 h-4 shrink-0"
-                                        style={{ color: 'var(--on-surface-variant)' }}
-                                    />
-                                    <Input
-                                        value={productSearch}
-                                        onChange={(e) => setProductSearch(e.target.value)}
-                                        placeholder="Search for products to link..."
-                                        className="flex-1 text-sm bg-transparent border-0 shadow-none px-0 focus-visible:ring-0"
-                                        style={{ color: 'var(--on-surface)' }}
-                                    />
-                                </div>
-                                <div className="max-h-40 overflow-y-auto p-2 space-y-1">
-                                    {filteredProducts.map((product) => {
-                                        const isSelected = (selectedProductIds ?? []).includes(product.id)
-                                        return (
-                                            <Button
-                                                key={product.id}
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() => toggleProduct(product.id)}
-                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left justify-start h-auto"
-                                                style={{
-                                                    background: isSelected
-                                                        ? 'var(--primary-fixed)'
-                                                        : 'transparent',
-                                                    color: isSelected
-                                                        ? 'var(--on-primary-fixed)'
-                                                        : 'var(--on-surface)',
-                                                }}
-                                            >
-                                                <Checkbox checked={isSelected} className="pointer-events-none" />
-                                                <span className="truncate flex-1">{product.name}</span>
-                                                <span className="text-xs opacity-60">${product.price}</span>
-                                            </Button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                            {(selectedProductIds?.length ?? 0) > 0 ? (
-                                <p className="text-xs mt-1.5" style={{ color: 'var(--on-surface-variant)' }}>
-                                    {selectedProductIds.length} product
-                                    {selectedProductIds.length !== 1 ? 's' : ''} selected
-                                </p>
-                            ) : null}
-                        </Field>
-
-                        <Field label="Affiliate Code" required error={errors.affiliateCode?.message}>
-                            <div className="flex gap-2">
-                                <Input
-                                    {...register('affiliateCode', {
-                                        required: 'Affiliate code is required',
-                                    })}
-                                    placeholder="EX-PARTNER-2024"
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm h-auto font-mono uppercase shadow-none"
-                                    style={{
-                                        background: 'var(--surface-container-low)',
-                                        color: 'var(--on-surface)',
-                                        border: errors.affiliateCode
-                                            ? '2px solid var(--error)'
-                                            : '2px solid transparent',
-                                    }}
-                                    onFocus={(e) => {
-                                        e.currentTarget.style.border = errors.affiliateCode
-                                            ? '2px solid var(--error)'
-                                            : '2px solid rgba(43,75,185,0.4)'
-                                        e.currentTarget.style.background = 'var(--surface-container-lowest)'
-                                    }}
-                                    onBlur={(e) => {
-                                        e.currentTarget.style.border = errors.affiliateCode
-                                            ? '2px solid var(--error)'
-                                            : '2px solid transparent'
-                                        e.currentTarget.style.background = 'var(--surface-container-low)'
-                                    }}
-                                    onChange={(e) =>
-                                        setValue('affiliateCode', e.target.value.toUpperCase(), {
-                                            shouldValidate: true,
-                                        })
-                                    }
-                                />
-                                <Button
-                                    type="button"
-                                    onClick={regenerateCode}
-                                    className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-                                    style={{
-                                        background: 'var(--surface-container-high)',
-                                        color: 'var(--on-surface-variant)',
-                                    }}
-                                    title="Regenerate code"
-                                >
-                                    <RefreshCw className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </Field>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface-container-low)' }}>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--primary)' }}>
-                                        Discount Configuration
-                                    </span>
-                                    <div className="flex gap-1">
-                                        {(['fixed', 'percentage'] as const).map((type) => (
-                                            <Button
-                                                key={type}
-                                                type="button"
-                                                onClick={() => setValue('discountType', type)}
-                                                className="text-xs font-semibold px-2.5 py-1 rounded-md h-auto"
-                                                style={
-                                                    discountType === type
-                                                        ? { background: 'var(--primary)', color: 'white' }
-                                                        : {
-                                                            background: 'var(--surface-container-high)',
-                                                            color: 'var(--on-surface-variant)',
-                                                        }
-                                                }
-                                            >
-                                                {type === 'fixed' ? 'FIXED' : '%'}
-                                            </Button>
-                                        ))}
+                        {/* Affiliate Details Section */}
+                        <Card className="shadow-sm">
+                            <CardHeader className="border-b">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                                        <Link2 className="w-5 h-5 text-emerald-700" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-base">Affiliate Details</CardTitle>
+                                        <CardDescription className="text-xs mt-0.5">
+                                            Product linking and commercial terms.
+                                        </CardDescription>
                                     </div>
                                 </div>
-                                <Field label="Discount Value" error={errors.discountValue?.message}>
-                                    <div className="relative">
-                                        {discountType === 'fixed' ? (
-                                            <span
-                                                className="absolute left-3 top-1/2 -translate-y-1/2 text-sm"
-                                                style={{ color: 'var(--on-surface-variant)' }}
-                                            >
-                                                $
-                                            </span>
-                                        ) : null}
-                                        <Input
-                                            {...register('discountValue', {
-                                                required: 'Required',
-                                                validate: (value) => {
-                                                    const numeric = Number(value)
-                                                    if (Number.isNaN(numeric)) return 'Enter a valid number'
-                                                    if (numeric < 0) return 'Must be >= 0'
-                                                    if (discountType === 'percentage' && numeric > 100) {
-                                                        return 'Max 100%'
-                                                    }
-                                                    return true
-                                                },
-                                            })}
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="w-full py-2.5 rounded-lg text-sm h-auto shadow-none"
-                                            style={{
-                                                background: 'var(--surface-container-lowest)',
-                                                color: 'var(--on-surface)',
-                                                border: errors.discountValue
-                                                    ? '2px solid var(--error)'
-                                                    : '2px solid transparent',
-                                                paddingLeft: discountType === 'fixed' ? '1.75rem' : '0.875rem',
-                                                paddingRight: discountType === 'percentage' ? '1.75rem' : '0.875rem',
-                                            }}
-                                            onChange={(e) => {
-                                                setValue('discountValue', toNonNegativeString(e.target.value), {
-                                                    shouldValidate: true,
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-5">
+                                {/* Product Selection */}
+                                <div className="space-y-2">
+                                    <Label>Product Selection</Label>
+                                    <div className="rounded-lg border bg-card overflow-hidden">
+                                        <div className="flex items-center gap-2 px-3 py-2.5 border-b">
+                                            <Search className="w-4 h-4 shrink-0 text-muted-foreground" />
+                                            <Input
+                                                value={productSearch}
+                                                onChange={(e) => setProductSearch(e.target.value)}
+                                                placeholder="Search for products to link..."
+                                                className="flex-1 text-sm bg-transparent border-0 shadow-none px-0 focus-visible:ring-0"
+                                            />
+                                            {isSearchingProducts && (
+                                                <Spinner className="w-4 h-4 text-muted-foreground" />
+                                            )}
+                                        </div>
+                                        <div className="max-h-40 overflow-y-auto p-2 space-y-1">
+                                            {isLoadingProducts ? (
+                                                <div className="flex items-center justify-center py-8">
+                                                    <Spinner className="w-6 h-6 text-primary" />
+                                                    <span className="ml-2 text-sm text-muted-foreground">
+                                                        Loading products...
+                                                    </span>
+                                                </div>
+                                            ) : products?.length === 0 ? (
+                                                <div className="py-8 text-center text-sm text-muted-foreground">
+                                                    {productSearch
+                                                        ? 'No products found matching your search.'
+                                                        : 'No products available.'}
+                                                </div>
+                                            ) : (
+                                                products?.map((product) => {
+                                                    const isSelected = (selectedProductIds ?? []).includes(
+                                                        product.id
+                                                    )
+                                                    return (
+                                                        <div
+                                                            key={product.id}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            onClick={() => toggleProduct(product.id)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                                    e.preventDefault()
+                                                                    toggleProduct(product.id)
+                                                                }
+                                                            }}
+                                                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors hover:bg-accent ${isSelected ? 'bg-primary/10' : ''
+                                                                }`}
+                                                        >
+                                                            {isSelected ? (
+                                                                <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                                                            ) : (
+                                                                <div className="w-4 h-4 rounded border border-input shrink-0" />
+                                                            )}
+                                                            <span className="truncate flex-1">{product.title}</span>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Rs. {product.price.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                    )
                                                 })
-                                            }}
-                                            onFocus={(e) => {
-                                                e.currentTarget.style.border = '2px solid rgba(43,75,185,0.4)'
-                                            }}
-                                            onBlur={(e) => {
-                                                e.currentTarget.style.border = errors.discountValue
-                                                    ? '2px solid var(--error)'
-                                                    : '2px solid transparent'
-                                            }}
-                                        />
-                                        {discountType === 'percentage' ? (
-                                            <span
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-sm"
-                                                style={{ color: 'var(--on-surface-variant)' }}
-                                            >
-                                                %
-                                            </span>
-                                        ) : null}
+                                            )}
+                                        </div>
                                     </div>
-                                </Field>
-                            </div>
+                                    {(selectedProductIds?.length ?? 0) > 0 && (
+                                        <p className="text-xs text-muted-foreground mt-1.5">
+                                            {selectedProductIds.length} product
+                                            {selectedProductIds.length !== 1 ? 's' : ''} selected
+                                        </p>
+                                    )}
+                                </div>
 
-                            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface-container-low)' }}>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--tertiary)' }}>
-                                        Commission Configuration
-                                    </span>
-                                    <div className="flex gap-1">
-                                        {(['fixed', 'percentage'] as const).map((type) => (
-                                            <Button
-                                                key={type}
-                                                type="button"
-                                                onClick={() => setValue('commissionType', type)}
-                                                className="text-xs font-semibold px-2.5 py-1 rounded-md h-auto"
-                                                style={
-                                                    commissionType === type
-                                                        ? { background: 'var(--primary)', color: 'white' }
-                                                        : {
-                                                            background: 'var(--surface-container-high)',
-                                                            color: 'var(--on-surface-variant)',
+                                <FormField
+                                    control={form.control}
+                                    name="affiliateCode"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Affiliate Code *</FormLabel>
+                                            <FormControl>
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="KTM-PARTNER-2026"
+                                                        className="flex-1 font-mono uppercase"
+                                                        onChange={(e) =>
+                                                            field.onChange(e.target.value.toUpperCase())
                                                         }
-                                                }
-                                            >
-                                                {type === 'fixed' ? 'FIXED' : '%'}
-                                            </Button>
-                                        ))}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        onClick={regenerateCode}
+                                                        title="Regenerate code"
+                                                    >
+                                                        <RefreshCw className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/* Discount & Commission Configuration */}
+                                <div className="rounded-xl border bg-muted/20 p-5 space-y-6">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative">
+                                        {/* Divider for desktop */}
+                                        <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-px bg-border -translate-x-1/2" />
+
+                                        {/* Discount Configuration */}
+                                        <div className="space-y-5">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-foreground">Customer Discount</h4>
+                                                    <p className="text-xs text-muted-foreground mt-1">What the referred buyer receives</p>
+                                                </div>
+                                                <div className="flex items-center bg-background border rounded-lg p-1 shadow-sm">
+                                                    {(['fixed', 'percentage'] as const).map((type) => (
+                                                        <button
+                                                            key={type}
+                                                            type="button"
+                                                            onClick={() => form.setValue('discountType', type)}
+                                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${discountType === type
+                                                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                                                                }`}
+                                                        >
+                                                            {type === 'fixed' ? 'Fixed (Rs)' : 'Percent (%)'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <FormField
+                                                control={form.control}
+                                                name="discountValue"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="sr-only">Discount Value</FormLabel>
+                                                        <FormControl>
+                                                            <div className="relative flex items-center">
+                                                                <div className="absolute left-3 text-muted-foreground font-medium">
+                                                                    {discountType === 'fixed' ? 'Rs ' : '%'}
+                                                                </div>
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    className="pl-8 h-11 text-lg font-medium"
+                                                                    onChange={(e) =>
+                                                                        field.onChange(
+                                                                            toNonNegativeString(e.target.value)
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+
+                                        {/* Commission Configuration */}
+                                        <div className="space-y-5">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-emerald-600">Partner Commission</h4>
+                                                    <p className="text-xs text-muted-foreground mt-1">What the affiliate earns per sale</p>
+                                                </div>
+                                                <div className="flex items-center bg-background border rounded-lg p-1 shadow-sm">
+                                                    {(['fixed', 'percentage'] as const).map((type) => (
+                                                        <button
+                                                            key={type}
+                                                            type="button"
+                                                            onClick={() => form.setValue('commissionType', type)}
+                                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${commissionType === type
+                                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                                                                }`}
+                                                        >
+                                                            {type === 'fixed' ? 'Fixed (Rs)' : 'Percent (%)'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <FormField
+                                                control={form.control}
+                                                name="commissionValue"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="sr-only">Commission Value</FormLabel>
+                                                        <FormControl>
+                                                            <div className="relative flex items-center">
+                                                                <div className="absolute left-3 text-emerald-600 font-medium">
+                                                                    {commissionType === 'fixed' ? 'Rs' : '%'}
+                                                                </div>
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    className="pl-8 h-11 text-lg font-medium border-emerald-200 focus-visible:ring-emerald-500"
+                                                                    onChange={(e) =>
+                                                                        field.onChange(
+                                                                            toNonNegativeString(e.target.value)
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <Field
-                                    label={
-                                        commissionType === 'percentage'
-                                            ? 'Commission Percentage'
-                                            : 'Commission Value'
-                                    }
-                                    error={errors.commissionValue?.message}
-                                >
-                                    <div className="relative">
-                                        {commissionType === 'fixed' ? (
-                                            <span
-                                                className="absolute left-3 top-1/2 -translate-y-1/2 text-sm"
-                                                style={{ color: 'var(--on-surface-variant)' }}
-                                            >
-                                                $
-                                            </span>
-                                        ) : null}
-                                        <Input
-                                            {...register('commissionValue', {
-                                                required: 'Required',
-                                                validate: (value) => {
-                                                    const numeric = Number(value)
-                                                    if (Number.isNaN(numeric)) return 'Enter a valid number'
-                                                    if (numeric < 0) return 'Must be >= 0'
-                                                    if (commissionType === 'percentage' && numeric > 100) {
-                                                        return 'Max 100%'
-                                                    }
-                                                    return true
-                                                },
-                                            })}
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="w-full py-2.5 rounded-lg text-sm h-auto shadow-none"
-                                            style={{
-                                                background: 'var(--surface-container-lowest)',
-                                                color: 'var(--on-surface)',
-                                                border: errors.commissionValue
-                                                    ? '2px solid var(--error)'
-                                                    : '2px solid transparent',
-                                                paddingLeft: commissionType === 'fixed' ? '1.75rem' : '0.875rem',
-                                                paddingRight:
-                                                    commissionType === 'percentage' ? '1.75rem' : '0.875rem',
-                                            }}
-                                            onChange={(e) => {
-                                                setValue('commissionValue', toNonNegativeString(e.target.value), {
-                                                    shouldValidate: true,
-                                                })
-                                            }}
-                                            onFocus={(e) => {
-                                                e.currentTarget.style.border = '2px solid rgba(43,75,185,0.4)'
-                                            }}
-                                            onBlur={(e) => {
-                                                e.currentTarget.style.border = errors.commissionValue
-                                                    ? '2px solid var(--error)'
-                                                    : '2px solid transparent'
-                                            }}
-                                        />
-                                        {commissionType === 'percentage' ? (
-                                            <span
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-sm"
-                                                style={{ color: 'var(--on-surface-variant)' }}
-                                            >
-                                                %
-                                            </span>
-                                        ) : null}
+                            </CardContent>
+                        </Card>
+
+                        {/* Bank Details Section */}
+                        <Card className="shadow-sm">
+                            <CardHeader className="border-b">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                                        <Building2 className="w-5 h-5 text-amber-700" />
                                     </div>
-                                </Field>
-                            </div>
-                        </div>
-                    </SectionCard>
+                                    <div>
+                                        <CardTitle className="text-base">Bank Details</CardTitle>
+                                        <CardDescription className="text-xs mt-0.5">
+                                            Payout information for commission settlements.
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="bankName"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Bank Name</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. Global IME Bank" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                    <SectionCard
-                        icon={<Building2 className="w-5 h-5" />}
-                        iconBg="var(--warning-container, #fef3c7)"
-                        iconColor="var(--warning, #92400e)"
-                        title="Bank Details"
-                        subtitle="Payout information for commission settlements."
-                    >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Bank Name">
-                                <StyledInput
-                                    {...register('bankName')}
-                                    placeholder="e.g. Global Trust Bank"
-                                />
-                            </Field>
-                            <Field label="Account Number">
-                                <StyledInput
-                                    {...register('accountNumber')}
-                                    placeholder="XXXX-XXXX-XXXX-0000"
-                                    className="font-mono"
-                                />
-                            </Field>
-                        </div>
-                    </SectionCard>
+                                    <FormField
+                                        control={form.control}
+                                        name="accountNumber"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Account Number</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="0010000000000"
+                                                        className="font-mono"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                    <div className="flex items-center justify-between pt-2 pb-8">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => router.push('/dashboard/affiliates')}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold h-auto"
-                            style={{ color: 'var(--on-surface-variant)' }}
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            className="px-8 py-3 rounded-lg text-sm font-semibold text-white h-auto"
-                            style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
-                        >
-                            {isEdit ? 'Review Changes' : 'Create Affiliate & Link'}
-                        </Button>
-                    </div>
-                </form>
+                        {/* Form Actions */}
+                        <div className="flex items-center justify-between pt-2 pb-8">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => router.push('/dashboard/affiliates')}
+                                className="flex items-center gap-2"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={form.formState.isSubmitting}
+                            >
+                                {isEdit ? 'Review Changes' : 'Create Affiliate & Link'}
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
             </main>
         </div>
     )

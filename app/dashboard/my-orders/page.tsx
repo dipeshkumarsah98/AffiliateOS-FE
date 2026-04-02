@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_ORDERS, DUMMY_AFFILIATES } from '@/lib/dummy-data'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
@@ -101,7 +101,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
 }
 
 export default function MyOrdersPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Bell, LogOut, User } from 'lucide-react'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { useRouter } from 'next/navigation'
 
 interface TopbarProps {
@@ -16,7 +16,8 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export function Topbar({ title, description }: TopbarProps) {
-  const { currentUser, logout } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
+  const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)

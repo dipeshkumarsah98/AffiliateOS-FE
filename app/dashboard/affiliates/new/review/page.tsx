@@ -7,7 +7,7 @@ import {
   ArrowLeft, Info,
 } from 'lucide-react'
 import { Topbar } from '@/components/layout/Topbar'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { DUMMY_PRODUCTS } from '@/lib/dummy-data'
 import { loadFormDraft, clearFormDraft } from '@/lib/affiliate-form-store'
 import type { AffiliateFormData } from '@/lib/affiliate-form-store'
@@ -38,7 +38,7 @@ function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 export default function ReviewAffiliatePage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
   const [data, setData] = useState<AffiliateFormData | null>(null)
   const [confirmed, setConfirmed] = useState(false)

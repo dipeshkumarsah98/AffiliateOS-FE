@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useAuthStore } from "@/stores/auth-store";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -24,12 +25,10 @@ export function setApiToken(token: string | null) {
 }
 
 apiClient.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = window.localStorage.getItem("auth_token");
-    if (token) {
-      config.headers = config.headers ?? {};
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = useAuthStore.getState().authToken;
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
   return config;

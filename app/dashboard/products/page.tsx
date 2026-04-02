@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { useProductsQuery } from '@/hooks/use-products'
 import type { ProductListItem } from '@/lib/api/products'
@@ -23,7 +23,7 @@ import { Search, X, Package, Eye, AlertTriangle, RefreshCw } from 'lucide-react'
 const PAGE_SIZE = 5
 
 export default function ProductsPage() {
-    const { currentUser } = useApp()
+    const currentUser = useAuthStore((s) => s.currentUser)
     const router = useRouter()
     const isAdmin = currentUser?.roles.includes('admin')
 

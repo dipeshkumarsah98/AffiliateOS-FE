@@ -1,6 +1,6 @@
 'use client'
 
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_ORDERS, DUMMY_EARNINGS, DUMMY_AFFILIATES, DUMMY_WITHDRAWALS } from '@/lib/dummy-data'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
@@ -348,7 +348,7 @@ function VendorDashboard({ userId }: { userId: string }) {
 }
 
 export default function DashboardPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const isAdmin = currentUser?.roles.includes('admin')
 
   return (

@@ -2,14 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { useSendOtpMutation, useVerifyOtpMutation } from '@/hooks/use-auth'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { Layers, ArrowRight, RefreshCw, ChevronLeft, CheckCircle2, Zap, Shield } from 'lucide-react'
 import Link from 'next/link'
 
 export default function OtpPage() {
-  const { pendingEmail } = useApp()
+  const pendingEmail = useAuthStore((s) => s.pendingEmail)
+  const hasHydrated = useAuthStore((s) => s._hasHydrated)
   const router = useRouter()
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
@@ -20,8 +21,10 @@ export default function OtpPage() {
 
   const hasRedirected = useRef(false)
   useEffect(() => {
-    if (!pendingEmail && !hasRedirected.current) router.replace('/login')
-  }, [pendingEmail, router])
+    if (hasHydrated && !pendingEmail && !hasRedirected.current) {
+      router.replace('/login')
+    }
+  }, [pendingEmail, hasHydrated, router])
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>
@@ -85,7 +88,7 @@ export default function OtpPage() {
     }
   }
 
-  if (!pendingEmail) return null
+  if (!hasHydrated || !pendingEmail) return null
 
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--surface)' }}>

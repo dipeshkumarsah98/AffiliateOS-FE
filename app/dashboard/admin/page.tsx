@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_ORDERS, DUMMY_PRODUCTS, DUMMY_AFFILIATES } from '@/lib/dummy-data'
 import type { Order, Product, OrderStatus } from '@/lib/types'
@@ -24,12 +24,12 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 }
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; dot: string }> = {
-  pending:               { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b' },
+  pending: { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b' },
   awaiting_verification: { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
-  processing:            { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e' },
-  shipped:               { bg: '#eef2ff', color: '#3730a3', dot: '#6366f1' },
-  completed:             { bg: '#f0fdf4', color: '#166534', dot: '#16a34a' },
-  cancelled:             { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
+  processing: { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e' },
+  shipped: { bg: '#eef2ff', color: '#3730a3', dot: '#6366f1' },
+  completed: { bg: '#f0fdf4', color: '#166534', dot: '#16a34a' },
+  cancelled: { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
 }
 
 function StatusPill({ status }: { status: OrderStatus }) {
@@ -366,15 +366,15 @@ function CodVerificationModal({ order, onClose }: { order: Order; onClose: () =>
                 background: response === 'confirmed'
                   ? 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)'
                   : response === 'rejected'
-                  ? 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)'
-                  : 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)',
+                    ? 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)'
+                    : 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)',
               }}
             >
               {response === 'confirmed'
                 ? <><Check className="w-4 h-4" /> Confirm Order</>
                 : response === 'rejected'
-                ? <><XCircle className="w-4 h-4" /> Reject Order</>
-                : 'Select a Response'}
+                  ? <><XCircle className="w-4 h-4" /> Reject Order</>
+                  : 'Select a Response'}
             </button>
             <button
               onClick={onClose}
@@ -475,7 +475,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function AdminPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
   const [tab, setTab] = useState<AdminTab>('cod')
 

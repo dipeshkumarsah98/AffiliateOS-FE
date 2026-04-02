@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_ORDERS, DUMMY_AFFILIATES } from '@/lib/dummy-data'
 import type { Order, OrderStatus } from '@/lib/types'
@@ -40,30 +40,30 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 }
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; dot: string }> = {
-  pending:               { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b' },
+  pending: { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b' },
   awaiting_verification: { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
-  processing:            { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e' },
-  shipped:               { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
-  completed:             { bg: '#f0fdf4', color: '#166534', dot: '#16a34a' },
-  cancelled:             { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
+  processing: { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e' },
+  shipped: { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
+  completed: { bg: '#f0fdf4', color: '#166534', dot: '#16a34a' },
+  cancelled: { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
 }
 
 // journey steps in order
 const JOURNEY_STEPS: { status: string; label: string; icon: React.ElementType }[] = [
-  { status: 'pending',   label: 'Order Placed',     icon: CheckCircle2 },
-  { status: 'processing', label: 'Processing',       icon: Package },
-  { status: 'shipped',   label: 'Shipped',           icon: Truck },
-  { status: 'completed', label: 'Delivered',         icon: CheckCircle2 },
+  { status: 'pending', label: 'Order Placed', icon: CheckCircle2 },
+  { status: 'processing', label: 'Processing', icon: Package },
+  { status: 'shipped', label: 'Shipped', icon: Truck },
+  { status: 'completed', label: 'Delivered', icon: CheckCircle2 },
 ]
 
 const STATUS_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
-  { value: 'all',                label: 'All Statuses' },
-  { value: 'pending',            label: 'Pending' },
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
   { value: 'awaiting_verification', label: 'Awaiting' },
-  { value: 'processing',         label: 'Processing' },
-  { value: 'shipped',            label: 'Shipped' },
-  { value: 'completed',          label: 'Delivered' },
-  { value: 'cancelled',          label: 'Cancelled' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'completed', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 function AffiliateAvatar({ name }: { name: string }) {
@@ -443,7 +443,7 @@ function Pagination({ page, totalPages, total, pageSize, onChange }: {
 const PAGE_SIZE = 5
 
 export default function OrdersPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const searchParams = useSearchParams()
   const highlightId = searchParams.get('id')
 
@@ -739,7 +739,7 @@ export default function OrdersPage() {
                   <tr style={{ background: '#fafbff' }}>
                     {Array.from({ length: 7 }).map((_, i) => (
                       <td key={i} className="py-4 px-6">
-                        <div className="h-3 rounded-full animate-pulse" style={{ background: '#f1f5f9', width: ['80px','60px','140px','100px','120px','60px','80px'][i] }} />
+                        <div className="h-3 rounded-full animate-pulse" style={{ background: '#f1f5f9', width: ['80px', '60px', '140px', '100px', '120px', '60px', '80px'][i] }} />
                       </td>
                     ))}
                   </tr>

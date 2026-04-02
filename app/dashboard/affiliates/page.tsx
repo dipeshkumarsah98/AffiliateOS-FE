@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_AFFILIATES, DUMMY_PRODUCTS } from '@/lib/dummy-data'
 import type { Affiliate, AffiliateType } from '@/lib/types'
@@ -665,7 +665,7 @@ function ViewAffiliateModal({ affiliate, onEdit, onClose }: { affiliate: Affilia
         onClick={e => e.stopPropagation()}
       >
         {/* ── LEFT PANEL: Profile & Details ── */}
-        <div           className="flex-1 p-5 sm:p-8 flex flex-col gap-6">
+        <div className="flex-1 p-5 sm:p-8 flex flex-col gap-6">
           {/* Status + name */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -823,7 +823,7 @@ function ViewAffiliateModal({ affiliate, onEdit, onClose }: { affiliate: Affilia
 
 // ---- Main Page ----
 export default function AffiliatesPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
   const [viewAffiliate, setViewAffiliate] = useState<Affiliate | null>(null)
   const [search, setSearch] = useState('')
@@ -861,7 +861,7 @@ export default function AffiliatesPage() {
     <div className="flex flex-col min-h-screen">
       <Topbar title="Affiliates" description="Onboard and manage your affiliate partners" />
 
-          <div className="flex-1 p-4 md:p-8 space-y-4 md:space-y-6 max-w-[1440px]">
+      <div className="flex-1 p-4 md:p-8 space-y-4 md:space-y-6 max-w-[1440px]">
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {[

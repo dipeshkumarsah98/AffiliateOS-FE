@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_EARNINGS, DUMMY_WITHDRAWALS, DUMMY_AFFILIATES } from '@/lib/dummy-data'
 import { DollarSign, TrendingUp, Clock, CheckCircle, ShieldOff, ArrowUpRight, X, Check } from 'lucide-react'
@@ -128,7 +128,7 @@ function WithdrawModal({ available, onClose }: { available: number; onClose: () 
 }
 
 export default function EarningsPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
   const [showWithdraw, setShowWithdraw] = useState(false)
   const [activeTab, setActiveTab] = useState<'commission' | 'withdrawals'>('commission')
@@ -376,8 +376,8 @@ export default function EarningsPage() {
                               w.status === 'approved'
                                 ? { background: 'var(--tertiary-container)', color: 'var(--on-tertiary-container)' }
                                 : w.status === 'rejected'
-                                ? { background: 'var(--error-container)', color: 'var(--on-error-container)' }
-                                : { background: 'var(--warning-container)', color: 'var(--on-warning-container)' }
+                                  ? { background: 'var(--error-container)', color: 'var(--on-error-container)' }
+                                  : { background: 'var(--warning-container)', color: 'var(--on-warning-container)' }
                             }
                           >
                             {w.status.charAt(0).toUpperCase() + w.status.slice(1)}

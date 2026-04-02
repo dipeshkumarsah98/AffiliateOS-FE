@@ -1,12 +1,13 @@
 'use client'
 
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { LogOut, Mail, ShieldCheck, User, CalendarDays, Layers } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function ProfilePage() {
-  const { currentUser, logout } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
+  const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
 
   function handleLogout() {
@@ -27,10 +28,10 @@ export default function ProfilePage() {
   const roleLabel = isAdmin ? 'Chief Administrator' : 'Affiliate Partner'
 
   const info = [
-    { icon: User,        label: 'Full Name',     value: currentUser.name },
-    { icon: Mail,        label: 'Email Address', value: currentUser.email },
-    { icon: ShieldCheck, label: 'Role',          value: roleLabel },
-    { icon: CalendarDays,label: 'Member Since',  value: 'January 2024' },
+    { icon: User, label: 'Full Name', value: currentUser.name },
+    { icon: Mail, label: 'Email Address', value: currentUser.email },
+    { icon: ShieldCheck, label: 'Role', value: roleLabel },
+    { icon: CalendarDays, label: 'Member Since', value: 'January 2024' },
   ]
 
   return (

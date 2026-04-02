@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_WITHDRAWALS, DUMMY_AFFILIATES, DUMMY_EARNINGS } from '@/lib/dummy-data'
 import type { Withdrawal } from '@/lib/types'
@@ -307,7 +307,7 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MyWithdrawalsPage() {
-  const { currentUser } = useApp()
+  const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
 
   useEffect(() => {
@@ -347,7 +347,7 @@ export default function MyWithdrawalsPage() {
   )
 
   // Stats
-  const pending  = localWithdrawals.filter(w => w.status === 'pending').length
+  const pending = localWithdrawals.filter(w => w.status === 'pending').length
   const approved = localWithdrawals.filter(w => w.status === 'approved').length
   const rejected = localWithdrawals.filter(w => w.status === 'rejected').length
   const totalRequested = localWithdrawals.reduce((s, w) => s + w.amount, 0)

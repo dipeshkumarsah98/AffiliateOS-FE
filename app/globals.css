@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -137,8 +137,9 @@
 }
 
 @theme inline {
-  --font-sans: 'Inter', 'Inter Fallback', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Manrope', 'Manrope Fallback', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    "Manrope", "Manrope Fallback", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -210,10 +211,17 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     letter-spacing: -0.02em;
   }
-  button, [role="button"], a {
+  button,
+  [role="button"],
+  a {
     cursor: pointer;
   }
   button:disabled {
@@ -285,19 +293,34 @@
 
 /* Animation utilities */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-fade-in-up {
   animation: fadeInUp 0.2s ease-out;
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-container-low) 25%, var(--surface-container-high) 50%, var(--surface-container-low) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--surface-container-low) 25%,
+    var(--surface-container-high) 50%,
+    var(--surface-container-low) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }

@@ -1,4 +1,4 @@
-import { useApp } from '@/lib/store'
+import { useAuthStore } from '@/stores/auth-store'
 import type { ProductListItem } from '@/lib/api/products'
 import { formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +27,7 @@ export function ProductDetailDialog({
     onClose,
     onAdjustStock,
 }: ProductDetailDialogProps) {
-    const { currentUser } = useApp()
+    const currentUser = useAuthStore((s) => s.currentUser)
     const isAdmin = currentUser?.roles.includes('admin')
 
     if (!product) return null

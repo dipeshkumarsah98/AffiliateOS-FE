@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
-import { useApp } from "@/lib/store";
+import { useAuthStore } from "@/stores/auth-store";
 
 export function useSendOtpMutation() {
-  const { login } = useApp();
+  const login = useAuthStore((s) => s.login);
 
   return useMutation({
     mutationFn: async (email: string) => {
@@ -12,7 +12,7 @@ export function useSendOtpMutation() {
 }
 
 export function useVerifyOtpMutation() {
-  const { verifyOtp } = useApp();
+  const verifyOtp = useAuthStore((s) => s.verifyOtp);
 
   return useMutation({
     mutationFn: async (otp: string) => {
