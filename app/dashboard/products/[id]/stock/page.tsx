@@ -93,6 +93,15 @@ export default function StockAdjustmentPage() {
     } = useStockMovementsQuery(id)
     const { mutateAsync: createStockMovement, isPending: isSavingStockMovement } = useCreateStockMovementMutation(id)
 
+    // All state hooks must be called before any conditional returns
+    const [adjustType, setAdjustType] = useState<AdjustmentType>('add')
+    const [quantity, setQuantity] = useState<number | ''>('')
+    const [reason, setReason] = useState<Reason>('RESTOCK')
+    const [notes, setNotes] = useState('')
+    const [saveError, setSaveError] = useState<string | null>(null)
+    const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
+
+    // All hooks (including useMemo, useEffect) must be called before conditional returns
     const stockMovements = stockMovementsData?.items ?? []
     const recentMovements = useMemo(() => {
         return [...stockMovements]
@@ -108,17 +117,20 @@ export default function StockAdjustmentPage() {
         return Math.max(0, netStock)
     }, [stockMovements])
 
-    const [adjustType, setAdjustType] = useState<AdjustmentType>('add')
-    const [quantity, setQuantity] = useState<number | ''>('')
-    const [reason, setReason] = useState<Reason>('RESTOCK')
-    const [notes, setNotes] = useState('')
-    const [saveError, setSaveError] = useState<string | null>(null)
-    const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
+    const numericQuantity = typeof quantity === 'number' ? quantity : 0
+    const projectedStock = useMemo(() => {
+        if (!numericQuantity) return currentStock
+        if (adjustType === 'add') return currentStock + numericQuantity
+        return Math.max(0, currentStock - numericQuantity)
+    }, [adjustType, currentStock, numericQuantity])
+
+    const projectedHealth = stockHealth(projectedStock)
 
     useEffect(() => {
         setReason(REASON_OPTIONS[adjustType][0].id)
     }, [adjustType])
 
+    // Conditional returns must happen AFTER all hooks
     if (isStockMovementsLoading) {
         return <StockAdjustmentLoadingState />
     }
@@ -130,13 +142,6 @@ export default function StockAdjustmentPage() {
     const productName = productInfo?.title ?? 'Product'
     const productSlug = productInfo?.slug ?? 'N/A'
     const reasonOptions = REASON_OPTIONS[adjustType]
-    const numericQuantity = typeof quantity === 'number' ? quantity : 0
-    const projectedStock = useMemo(() => {
-        if (!numericQuantity) return currentStock
-        if (adjustType === 'add') return currentStock + numericQuantity
-        return Math.max(0, currentStock - numericQuantity)
-    }, [adjustType, currentStock, numericQuantity])
-    const projectedHealth = stockHealth(projectedStock)
 
     const handleSave = async () => {
         if (!quantity || Number(quantity) <= 0) return
@@ -173,7 +178,7 @@ export default function StockAdjustmentPage() {
         <div className="flex flex-col min-h-screen" style={{ background: '#f8faff' }}>
             <Topbar title="Stock Adjustment" description="" />
 
-            <div className="flex-1 p-4 md:p-8 max-w-360">
+            <div className="flex-1 p-4 md:p-8 max-w-screen-2xl mx-auto w-full">
                 <Button
                     variant="ghost"
                     onClick={() => router.push('/dashboard/products')}

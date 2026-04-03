@@ -85,7 +85,7 @@ export function ProductRow({ product, onView, onEdit, onStock }: ProductRowProps
 
             <TableCell className="py-5 px-6">
                 <p className="text-sm font-bold tabular-nums" style={{ color: '#2b4bb9' }}>
-                    Rs. {product.price.toFixed(2)}
+                    NRP {product.price.toFixed(2)}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>
                     Updated {formatDate(product.updatedAt)}
@@ -104,17 +104,6 @@ export function ProductRow({ product, onView, onEdit, onStock }: ProductRowProps
                     >
                         <Eye className="w-3.5 h-3.5" />
                         View
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={onEdit}
-                        className="h-auto px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#f4f5ff]"
-                        style={{ color: '#6b7280' }}
-                    >
-                        <Pencil className="w-3.5 h-3.5" />
-                        Edit
                     </Button>
                     <Button
                         type="button"

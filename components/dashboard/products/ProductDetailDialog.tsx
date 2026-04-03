@@ -15,6 +15,7 @@ import {
     getProductImage,
     statusBadge,
 } from '@/components/dashboard/products/helpers'
+import { formatRelative } from 'date-fns'
 
 type ProductDetailDialogProps = {
     product: ProductListItem | null
@@ -36,9 +37,9 @@ export function ProductDetailDialog({
 
     return (
         <Dialog open={Boolean(product)} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-4xl p-0 overflow-hidden" showCloseButton>
+            <DialogContent className="sm:max-w-5xl p-0 overflow-hidden" showCloseButton>
                 <div className="flex flex-col md:flex-row">
-                    <div className="md:w-64 shrink-0 relative" style={{ background: '#111' }}>
+                    <div className="md:w-72 shrink-0 relative" style={{ background: '#111' }}>
                         <img
                             src={getProductImage(product)}
                             alt={product.title}
@@ -70,7 +71,7 @@ export function ProductDetailDialog({
                                 className="text-xl font-bold"
                                 style={{ color: '#2b4bb9', fontFamily: 'var(--font-display)' }}
                             >
-                                ${product.price.toFixed(2)}
+                                NRP {product.price.toFixed(2)}
                             </DialogDescription>
                         </DialogHeader>
 
@@ -92,41 +93,23 @@ export function ProductDetailDialog({
                                     Last Updated
                                 </p>
                                 <p className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)', color: '#16a34a', letterSpacing: '-0.02em' }}>
-                                    {formatDate(product.updatedAt)}
+                                    {formatRelative(new Date(product.updatedAt), new Date())}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="rounded-xl p-4 mb-6" style={{ background: '#f8faff' }}>
-                            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#6b7280' }}>
-                                Record ID
-                            </p>
-                            <p className="text-sm font-mono" style={{ color: '#0f1623' }}>
-                                {product.id}
-                            </p>
-                        </div>
 
                         {isAdmin ? (
-                            <div className="flex gap-3 mt-auto">
-                                <Button
-                                    type="button"
-                                    className="flex-1 py-3 rounded-xl text-sm font-semibold text-white"
-                                    style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
-                                >
-                                    <Pencil className="w-4 h-4" />
-                                    Edit Full Details
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={() => onAdjustStock(product.id)}
-                                    variant="outline"
-                                    className="px-5 py-3 rounded-xl text-sm font-semibold"
-                                    style={{ background: '#f0f4ff', color: '#2b4bb9', borderColor: '#c7d2fe' }}
-                                >
-                                    <PackagePlus className="w-4 h-4" />
-                                    Adjust Stock
-                                </Button>
-                            </div>
+                            <Button
+                                type="button"
+                                onClick={() => onAdjustStock(product.id)}
+                                variant="outline"
+                                className="px-5 py-3 rounded-xl text-sm font-semibold"
+                                style={{ background: '#f0f4ff', color: '#2b4bb9', borderColor: '#c7d2fe' }}
+                            >
+                                <PackagePlus className="w-4 h-4" />
+                                Adjust Stock
+                            </Button>
                         ) : null}
                     </div>
                 </div>
