@@ -15,7 +15,7 @@ export interface DateRange {
 }
 
 export interface DateFilterValue {
-    type: 'today' | 'last_week' | 'last_month' | 'custom'
+    type: 'all_time' | 'today' | 'last_week' | 'last_month' | 'custom'
     range: DateRange
 }
 
@@ -26,6 +26,7 @@ interface DateFilterProps {
 }
 
 const PRESET_OPTIONS = [
+    { label: 'All Time', value: 'all_time' as const },
     { label: 'Today', value: 'today' as const },
     { label: 'Last Week', value: 'last_week' as const },
     { label: 'Last Month', value: 'last_month' as const },
@@ -37,6 +38,8 @@ function getPresetRange(type: DateFilterValue['type']): DateRange {
     today.setHours(0, 0, 0, 0)
 
     switch (type) {
+        case 'all_time':
+            return { from: undefined, to: undefined }
         case 'today':
             return { from: today, to: today }
         case 'last_week': {
@@ -140,6 +143,7 @@ export function DateFilter({ value, onChange, className }: DateFilterProps) {
                                     variant="outline"
                                     className="flex-1"
                                     onClick={() => {
+                                        onChange({ type: 'all_time', range: { from: undefined, to: undefined } })
                                         setTempRange({ from: undefined, to: undefined })
                                         setIsOpen(false)
                                     }}

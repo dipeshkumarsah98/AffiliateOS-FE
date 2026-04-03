@@ -27,6 +27,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Orders', href: '/dashboard/orders', icon: ClipboardList, roles: ['admin'] },
+  { label: 'COD Verification', href: '/dashboard/cod-verifications', icon: ClipboardList, roles: ['admin'] },
   { label: 'Products', href: '/dashboard/products', icon: Package, roles: ['admin'] },
   { label: 'Affiliates', href: '/dashboard/affiliates', icon: Users, roles: ['admin'] },
   { label: 'Admin', href: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] },

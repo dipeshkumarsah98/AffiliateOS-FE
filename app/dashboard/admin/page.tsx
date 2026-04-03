@@ -477,7 +477,7 @@ const STATUS_OPTIONS = [
 export default function AdminPage() {
   const currentUser = useAuthStore((s) => s.currentUser)
   const router = useRouter()
-  const [tab, setTab] = useState<AdminTab>('cod')
+  const [tab, setTab] = useState<AdminTab>('orders')
 
   // COD tab state
   const [codModal, setCodModal] = useState<Order | null>(null)
@@ -513,7 +513,6 @@ export default function AdminPage() {
     )
   }
 
-  // ── COD data ──
   const codOrders = DUMMY_ORDERS.filter(o => o.paymentMethod === 'cod' && o.status === 'awaiting_verification')
   const filteredCod = useMemo(() =>
     codOrders.filter(o =>
@@ -554,7 +553,6 @@ export default function AdminPage() {
   const paginatedProducts = filteredProducts.slice((safeProductPage - 1) * PAGE_SIZE, safeProductPage * PAGE_SIZE)
 
   const tabs: { id: AdminTab; label: string; icon: React.ElementType; count?: number }[] = [
-    { id: 'cod', label: 'COD Verification', icon: AlertCircle, count: codOrders.length },
     { id: 'orders', label: 'Order Management', icon: ClipboardList },
     { id: 'products', label: 'Product Management', icon: Package },
   ]
@@ -610,125 +608,6 @@ export default function AdminPage() {
             )
           })}
         </div>
-
-        {/* ═══════════════ COD VERIFICATION TAB ═══════════════ */}
-        {tab === 'cod' && (
-          <div className="space-y-4">
-            {/* Filter bar */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#9ca3af' }} />
-                <input
-                  type="text"
-                  placeholder="Search order ID or customer..."
-                  value={codSearch}
-                  onChange={e => { setCodSearch(e.target.value); setCodPage(1) }}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#374151' }}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#2b4bb9')}
-                  onBlur={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
-                />
-              </div>
-              <button className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: '#eff3ff', border: '1px solid #d0d9ff' }}>
-                <Filter className="w-4 h-4" style={{ color: '#2b4bb9' }} />
-              </button>
-            </div>
-
-            {/* Table card */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', border: '1px solid #f1f5f9' }}>
-              <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #f4f5ff' }}>
-                <div>
-                  <h3 className="text-base font-bold" style={{ color: '#0f172a', letterSpacing: '-0.01em' }}>Pending COD Orders</h3>
-                  <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>{codOrders.length} orders awaiting customer confirmation</p>
-                </div>
-              </div>
-
-              {paginatedCod.length === 0 ? (
-                <div className="py-20 text-center">
-                  <Check className="w-10 h-10 mx-auto mb-3 opacity-30 text-green-500" />
-                  <p className="text-sm font-medium" style={{ color: '#9ca3af' }}>All COD orders verified</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid #f4f5ff', background: '#fafbff' }}>
-                        {['Order ID', 'Customer', 'Email', 'Phone', 'Amount', 'Status', 'Actions'].map(h => (
-                          <th key={h} className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#9ca3af' }}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedCod.map((order, idx) => (
-                        <tr
-                          key={order.id}
-                          style={{ borderBottom: idx === paginatedCod.length - 1 ? 'none' : '1px solid #f4f5ff' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = '#fafbff')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          className="transition-colors"
-                        >
-                          <td className="py-5 px-6">
-                            <span className="font-mono text-sm font-bold" style={{ color: '#2b4bb9' }}>{order.id}</span>
-                          </td>
-                          <td className="py-5 px-6">
-                            <span className="text-sm font-semibold" style={{ color: '#0f172a' }}>{order.customerName}</span>
-                          </td>
-                          <td className="py-5 px-6">
-                            <span className="text-sm" style={{ color: '#374151' }}>{order.customerEmail}</span>
-                          </td>
-                          <td className="py-5 px-6">
-                            <span className="text-sm" style={{ color: '#374151' }}>{order.customerPhone}</span>
-                          </td>
-                          <td className="py-5 px-6">
-                            <span className="text-sm font-bold" style={{ color: '#0f172a' }}>${order.total.toFixed(2)}</span>
-                          </td>
-                          <td className="py-5 px-6">
-                            <StatusPill status={order.status} />
-                          </td>
-                          <td className="py-5 px-6">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setCodModal(order)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                                style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                Verify
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Skeleton filler */}
-                      {paginatedCod.length > 0 && paginatedCod.length < PAGE_SIZE && (
-                        <tr style={{ background: '#fafbff' }}>
-                          {[80, 110, 160, 100, 60, 80, 80].map((w, i) => (
-                            <td key={i} className="py-5 px-6">
-                              <div className="h-3.5 rounded-full animate-pulse" style={{ background: '#f1f5f9', width: w }} />
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {filteredCod.length > PAGE_SIZE && (
-                <div style={{ borderTop: '1px solid #f4f5ff' }}>
-                  <Pagination
-                    page={safeCodPage} totalPages={codTotalPages}
-                    total={filteredCod.length} pageSize={PAGE_SIZE}
-                    onChange={p => setCodPage(p)}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ═══════════════ ORDER MANAGEMENT TAB ═══════════════ */}
         {tab === 'orders' && (

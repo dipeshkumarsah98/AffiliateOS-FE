@@ -1,13 +1,18 @@
 'use client'
 
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_ORDERS, DUMMY_EARNINGS, DUMMY_AFFILIATES, DUMMY_WITHDRAWALS } from '@/lib/dummy-data'
 import { StatusBadge } from '@/components/dashboard/StatusBadge'
-import { TrendingUp, Package, ClipboardList, DollarSign, AlertCircle, Users, Clock } from 'lucide-react'
-import type { Order } from '@/lib/types'
+import { TrendingUp, Package, ClipboardList, DollarSign, AlertCircle, Users, Clock, Filter, ChevronDown } from 'lucide-react'
+import type { Order, OrderStatus } from '@/lib/types'
 import Link from 'next/link'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { DateFilter, DateFilterValue } from '@/components/dashboard/orders/DateFilter'
+import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 const CHART_DATA = [
   { month: 'Oct', revenue: 18400 },
@@ -17,6 +22,45 @@ const CHART_DATA = [
   { month: 'Feb', revenue: 34200 },
   { month: 'Mar', revenue: 41600 },
 ]
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'awaiting_verification', label: 'Pending COD' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
+function getDefaultDateFilter(): DateFilterValue {
+  return {
+    type: 'all_time',
+    range: {
+      from: undefined,
+      to: undefined
+    }
+  }
+}
+
+function Select({ value, onChange, options, className }: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  className?: string
+}) {
+  return (
+    <div className={cn('relative', className)}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full appearance-none pl-3.5 pr-9 py-2.5 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-gray-200 text-gray-700 hover:border-[#2b4bb9] focus:border-[#2b4bb9] focus:ring-2 focus:ring-[#2b4bb9]/10"
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-gray-400" />
+    </div>
+  )
+}
 
 function MetricCard({
   label, value, sub, icon: Icon, accent, variant = 'default',
@@ -116,14 +160,97 @@ function RecentOrderRow({ order }: { order: Order }) {
 }
 
 function AdminDashboard() {
-  const totalOrders = DUMMY_ORDERS.length
-  const totalRevenue = DUMMY_ORDERS.filter(o => o.status === 'completed').reduce((s, o) => s + o.total, 0)
-  const pendingCod = DUMMY_ORDERS.filter(o => o.status === 'awaiting_verification').length
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Initialize from URL params
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>(() => {
+    const fromDate = searchParams.get('fromDate')
+    const toDate = searchParams.get('toDate')
+    const filterType = searchParams.get('dateType') as DateFilterValue['type']
+
+    if (fromDate && toDate) {
+      return {
+        type: filterType || 'custom',
+        range: {
+          from: new Date(fromDate),
+          to: new Date(toDate)
+        }
+      }
+    }
+    return getDefaultDateFilter()
+  })
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all')
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams()
+
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (dateFilter.range.from) params.set('fromDate', format(dateFilter.range.from, 'yyyy-MM-dd'))
+    if (dateFilter.range.to) params.set('toDate', format(dateFilter.range.to, 'yyyy-MM-dd'))
+    if (dateFilter.type && dateFilter.type !== 'all_time') params.set('dateType', dateFilter.type)
+
+    const newUrl = params.toString() ? `/dashboard?${params.toString()}` : '/dashboard'
+    router.replace(newUrl, { scroll: false })
+  }, [statusFilter, dateFilter, router])
+
+  // Filter orders based on date and status
+  const filteredOrders = useMemo(() => {
+    let orders = DUMMY_ORDERS
+
+    // Date filter
+    if (dateFilter.range.from && dateFilter.range.to) {
+      const fromTime = dateFilter.range.from.getTime()
+      const toTime = dateFilter.range.to.getTime() + 86400000 // End of day
+      orders = orders.filter(o => {
+        const orderTime = new Date(o.createdAt).getTime()
+        return orderTime >= fromTime && orderTime <= toTime
+      })
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      orders = orders.filter(o => o.status === statusFilter)
+    }
+
+    return orders
+  }, [dateFilter, statusFilter])
+
+  const totalOrders = filteredOrders.length
+  const totalRevenue = filteredOrders.filter(o => o.status === 'completed').reduce((s, o) => s + o.total, 0)
+  const pendingCod = filteredOrders.filter(o => o.status === 'awaiting_verification').length
   const activeAffiliates = DUMMY_AFFILIATES.filter(a => a.status === 'active').length
-  const recentOrders = DUMMY_ORDERS.slice(0, 6)
+  const recentOrders = filteredOrders.slice(0, 6)
 
   return (
-    <div className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8 max-w-[1440px]">
+    <div className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8 max-w-[1440px] mx-auto w-full">
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2.5 flex-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#eef2ff]">
+            <Filter className="w-4 h-4 text-[#2b4bb9]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-gray-900">Filter Dashboard Data</h3>
+            <p className="text-xs text-gray-500">Customize your view with date and status filters</p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+          <Select
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            className="w-full sm:w-48"
+          />
+          <DateFilter
+            value={dateFilter}
+            onChange={setDateFilter}
+            className="w-full sm:w-52"
+          />
+        </div>
+      </div>
+
       {/* Metrics */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
         <MetricCard label="Total Orders" value={totalOrders.toString()} sub="All time" icon={ClipboardList} accent="#2b4bb9" />
@@ -174,11 +301,11 @@ function AdminDashboard() {
               Order Breakdown
             </h3>
             {[
-              { label: 'Completed', count: DUMMY_ORDERS.filter(o => o.status === 'completed').length, bg: 'var(--tertiary-container)', fg: 'var(--on-tertiary-container)' },
-              { label: 'Processing', count: DUMMY_ORDERS.filter(o => o.status === 'processing').length, bg: 'var(--secondary-container)', fg: 'var(--on-secondary-container)' },
-              { label: 'Shipped', count: DUMMY_ORDERS.filter(o => o.status === 'shipped').length, bg: 'var(--primary-fixed)', fg: 'var(--on-primary-fixed)' },
-              { label: 'Pending COD', count: DUMMY_ORDERS.filter(o => o.status === 'awaiting_verification').length, bg: 'var(--warning-container)', fg: 'var(--on-warning-container)' },
-              { label: 'Cancelled', count: DUMMY_ORDERS.filter(o => o.status === 'cancelled').length, bg: 'var(--error-container)', fg: 'var(--on-error-container)' },
+              { label: 'Completed', count: filteredOrders.filter(o => o.status === 'completed').length, bg: 'var(--tertiary-container)', fg: 'var(--on-tertiary-container)' },
+              { label: 'Processing', count: filteredOrders.filter(o => o.status === 'processing').length, bg: 'var(--secondary-container)', fg: 'var(--on-secondary-container)' },
+              { label: 'Shipped', count: filteredOrders.filter(o => o.status === 'shipped').length, bg: 'var(--primary-fixed)', fg: 'var(--on-primary-fixed)' },
+              { label: 'Pending COD', count: filteredOrders.filter(o => o.status === 'awaiting_verification').length, bg: 'var(--warning-container)', fg: 'var(--on-warning-container)' },
+              { label: 'Cancelled', count: filteredOrders.filter(o => o.status === 'cancelled').length, bg: 'var(--error-container)', fg: 'var(--on-error-container)' },
             ].map(s => (
               <div key={s.label} className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-2.5">
@@ -232,14 +359,71 @@ function AdminDashboard() {
 
 // ---- Vendor Dashboard ----
 function VendorDashboard({ userId }: { userId: string }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Initialize from URL params
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>(() => {
+    const fromDate = searchParams.get('fromDate')
+    const toDate = searchParams.get('toDate')
+    const filterType = searchParams.get('dateType') as DateFilterValue['type']
+
+    if (fromDate && toDate) {
+      return {
+        type: filterType || 'custom',
+        range: {
+          from: new Date(fromDate),
+          to: new Date(toDate)
+        }
+      }
+    }
+    return getDefaultDateFilter()
+  })
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all')
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams()
+
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (dateFilter.range.from) params.set('fromDate', format(dateFilter.range.from, 'yyyy-MM-dd'))
+    if (dateFilter.range.to) params.set('toDate', format(dateFilter.range.to, 'yyyy-MM-dd'))
+    if (dateFilter.type && dateFilter.type !== 'all_time') params.set('dateType', dateFilter.type)
+
+    const newUrl = params.toString() ? `/dashboard?${params.toString()}` : '/dashboard'
+    router.replace(newUrl, { scroll: false })
+  }, [statusFilter, dateFilter, router])
+
   const affiliate = DUMMY_AFFILIATES.find(a => {
     const user = { 'u2': 'af1', 'u3': 'af2' } as Record<string, string>
     return a.id === user[userId]
   })
 
   const myEarnings = DUMMY_EARNINGS.filter(e => e.affiliateId === affiliate?.id)
-  const myOrders = DUMMY_ORDERS.filter(o => affiliate && o.affiliateCode === affiliate.affiliateCode)
+  const allMyOrders = DUMMY_ORDERS.filter(o => affiliate && o.affiliateCode === affiliate.affiliateCode)
   const myWithdrawals = DUMMY_WITHDRAWALS.filter(w => w.affiliateId === affiliate?.id)
+
+  // Filter orders based on date and status
+  const myOrders = useMemo(() => {
+    let orders = allMyOrders
+
+    // Date filter
+    if (dateFilter.range.from && dateFilter.range.to) {
+      const fromTime = dateFilter.range.from.getTime()
+      const toTime = dateFilter.range.to.getTime() + 86400000 // End of day
+      orders = orders.filter(o => {
+        const orderTime = new Date(o.createdAt).getTime()
+        return orderTime >= fromTime && orderTime <= toTime
+      })
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      orders = orders.filter(o => o.status === statusFilter)
+    }
+
+    return orders
+  }, [allMyOrders, dateFilter, statusFilter])
 
   const totalEarnings = myEarnings.reduce((s, e) => s + e.commissionAmount, 0)
   const paidOut = myEarnings.filter(e => e.status === 'paid').reduce((s, e) => s + e.commissionAmount, 0)
@@ -249,7 +433,33 @@ function VendorDashboard({ userId }: { userId: string }) {
   const availableToWithdraw = paidOut - myWithdrawals.filter(w => w.status === 'approved').reduce((s, w) => s + w.amount, 0)
 
   return (
-    <div className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8 max-w-[1440px]">
+    <div className="flex-1 p-4 md:p-8 space-y-6 md:space-y-8 max-w-[1440px] mx-auto w-full">
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2.5 flex-1">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#eef2ff]">
+            <Filter className="w-4 h-4 text-[#2b4bb9]" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-gray-900">Filter Your Performance</h3>
+            <p className="text-xs text-gray-500">View your affiliate metrics by date and order status</p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+          <Select
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={STATUS_FILTER_OPTIONS}
+            className="w-full sm:w-48"
+          />
+          <DateFilter
+            value={dateFilter}
+            onChange={setDateFilter}
+            className="w-full sm:w-52"
+          />
+        </div>
+      </div>
+
       {/* Affiliate code banner */}
       {affiliate && (
         <div

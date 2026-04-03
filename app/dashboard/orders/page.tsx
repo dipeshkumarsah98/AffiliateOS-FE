@@ -30,10 +30,10 @@ const PAGE_SIZE = 5
 
 function getDefaultDateFilter(): DateFilterValue {
   return {
-    type: 'last_week',
+    type: 'all_time',
     range: {
-      from: new Date(new Date().setDate(new Date().getDate() - 7)),
-      to: new Date()
+      from: undefined,
+      to: undefined
     }
   }
 }
@@ -79,7 +79,7 @@ export default function OrdersPage() {
     if (page !== 1) params.set('page', String(page))
     if (dateFilter.range.from) params.set('fromDate', format(dateFilter.range.from, 'yyyy-MM-dd'))
     if (dateFilter.range.to) params.set('toDate', format(dateFilter.range.to, 'yyyy-MM-dd'))
-    if (dateFilter.type) params.set('dateType', dateFilter.type)
+    if (dateFilter.type && dateFilter.type !== 'all_time') params.set('dateType', dateFilter.type)
 
     const newUrl = params.toString() ? `/dashboard/orders?${params.toString()}` : '/dashboard/orders'
     router.replace(newUrl, { scroll: false })

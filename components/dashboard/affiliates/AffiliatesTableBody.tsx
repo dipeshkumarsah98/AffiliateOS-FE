@@ -111,14 +111,7 @@ export function AffiliatesTableBody({
                     onEdit={() => onEdit(affiliate)}
                 />
             ))}
-            {affiliates.length < pageSize
-                ? Array.from({ length: pageSize - affiliates.length }).map((_, i) => (
-                    <TableSkeletonRow
-                        key={`filler-${i}`}
-                        cellWidths={SKELETON_CELL_WIDTHS}
-                    />
-                ))
-                : null}
+
         </>
     );
 }
