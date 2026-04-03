@@ -9,7 +9,7 @@ import { Layers, ArrowRight, CheckCircle2, Zap, Shield } from 'lucide-react'
 const DEMO_ACCOUNTS = [
   { email: 'admin@affiliateos.com', label: 'Admin', color: 'var(--primary-fixed)', textColor: 'var(--on-primary-fixed)' },
   { email: 'jordan@partner.com', label: 'Vendor (Jordan)', color: 'var(--secondary-container)', textColor: 'var(--on-secondary-container)' },
-  { email: 'priya@creator.io', label: 'Vendor (Priya)', color: 'var(--tertiary-container)', textColor: 'var(--on-tertiary-container)' },
+  { email: 'priya@reseller.io', label: 'Vendor (Priya)', color: 'var(--tertiary-container)', textColor: 'var(--on-tertiary-container)' },
 ]
 
 export default function LoginPage() {

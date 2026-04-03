@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
 import { DUMMY_ORDERS, DUMMY_AFFILIATES } from '@/lib/dummy-data'
@@ -446,6 +446,7 @@ export default function OrdersPage() {
   const currentUser = useAuthStore((s) => s.currentUser)
   const searchParams = useSearchParams()
   const highlightId = searchParams.get('id')
+  const router = useRouter()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
@@ -527,6 +528,9 @@ export default function OrdersPage() {
               <button
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
                 style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
+                onClick={() => {
+                  router.push("/dashboard/orders/new");
+                }}
               >
                 <PackagePlus className="w-4 h-4" />
                 Create Order

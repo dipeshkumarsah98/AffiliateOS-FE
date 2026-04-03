@@ -8,24 +8,26 @@ import {
 } from 'lucide-react'
 import { Topbar } from '@/components/layout/Topbar'
 import { useAuthStore } from '@/stores/auth-store'
-import { DUMMY_PRODUCTS } from '@/lib/dummy-data'
+import { useProductsQuery } from '@/hooks/use-products'
+import { useCreateAffiliate, useUpdateAffiliate } from '@/hooks/use-affiliates'
 import { loadFormDraft, clearFormDraft } from '@/lib/affiliate-form-store'
 import type { AffiliateFormData } from '@/lib/affiliate-form-store'
+import type { CreateAffiliatePayload, UpdateAffiliatePayload, AffiliateTypeAPI, DiscountTypeAPI, CommissionTypeAPI } from '@/lib/api/affiliates'
+import { toast } from 'sonner'
+import { getApiErrorMessage } from '@/lib/api/client'
 
 const TYPE_LABELS: Record<string, string> = {
   influencer: 'Influencer',
-  creator: 'Creator',
-  shop_owner: 'Shop Owner',
-  blogger: 'Blogger',
-  other: 'Other',
+  reseller: 'Reseller',
+  referral: 'Referral',
+  partner: 'Partner',
 }
 
 const TYPE_COLORS: Record<string, { bg: string; fg: string }> = {
   influencer: { bg: '#ede9fe', fg: '#5b21b6' },
-  creator: { bg: '#dbeafe', fg: '#1d4ed8' },
-  shop_owner: { bg: '#d1fae5', fg: '#065f46' },
-  blogger: { bg: '#fef3c7', fg: '#92400e' },
-  other: { bg: '#f1f5f9', fg: '#475569' },
+  reseller: { bg: '#dbeafe', fg: '#1d4ed8' },
+  referral: { bg: '#d1fae5', fg: '#065f46' },
+  partner: { bg: '#fef3c7', fg: '#92400e' },
 }
 
 function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -42,7 +44,16 @@ export default function ReviewAffiliatePage() {
   const router = useRouter()
   const [data, setData] = useState<AffiliateFormData | null>(null)
   const [confirmed, setConfirmed] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
+
+  // Fetch products to display selected product details
+  const productsQuery = useProductsQuery({ page: 1, limit: 1000 })
+
+  // Mutations
+  const createMutation = useCreateAffiliate()
+  const updateMutation = useUpdateAffiliate(data?.editId ?? '')
+
+  const isEdit = !!data?.editId
+  const isSaving = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
     if (currentUser && !currentUser.roles.includes('admin')) {
@@ -60,20 +71,88 @@ export default function ReviewAffiliatePage() {
   if (!data) return null
 
   const typeColors = TYPE_COLORS[data.affiliateType] ?? TYPE_COLORS.other
-  const linkedProducts = DUMMY_PRODUCTS.filter(p => data.selectedProductIds?.includes(p.id))
-  const isEdit = !!data.editId
+
+  // Find selected product from fetched products
+  const selectedProduct = productsQuery.data?.items?.find(p => p.id === data.selectedProductId)
+
   const maskedAccount = data.accountNumber
     ? `**** ${data.accountNumber.slice(-4)}`
     : '—'
 
-  function handleConfirm() {
-    setIsSaving(true)
-    // In production this would call an API. For now simulate a short delay.
-    setTimeout(() => {
+  // Helper function to map form data to API payload
+  function buildApiPayload(): CreateAffiliatePayload | UpdateAffiliatePayload {
+    if (!data) throw new Error('Form data is required')
+
+    // Map lowercase form values to uppercase API values
+    const affiliateTypeMap: Record<string, AffiliateTypeAPI> = {
+      influencer: 'INFLUENCER',
+      reseller: 'RESELLER',
+      referral: 'REFERRAL',
+      partner: 'PARTNER',
+    }
+
+    const discountTypeMap: Record<string, DiscountTypeAPI> = {
+      fixed: 'FIXED',
+      percentage: 'PERCENTAGE',
+    }
+
+    const commissionTypeMap: Record<string, CommissionTypeAPI> = {
+      fixed: 'FIXED',
+      percentage: 'PERCENTAGE',
+    }
+
+    const affiliatePayload = {
+      productId: data.selectedProductId,
+      code: data.affiliateCode,
+      discountType: discountTypeMap[data.discountType],
+      discountValue: parseFloat(data.discountValue),
+      commissionType: commissionTypeMap[data.commissionType],
+      commissionValue: parseFloat(data.commissionValue),
+    }
+
+    if (isEdit) {
+      // For update, only send affiliate object
+      return {
+        affiliate: affiliatePayload,
+      } as UpdateAffiliatePayload
+    } else {
+      // For create, send both vendor and affiliate
+      return {
+        vendor: {
+          name: data.fullName,
+          email: data.email,
+          affiliateType: affiliateTypeMap[data.affiliateType],
+          contact: data.contactNumber,
+          address: data.physicalAddress,
+          bankName: data.bankName,
+          accountNumber: data.accountNumber,
+        },
+        affiliate: affiliatePayload,
+      } as CreateAffiliatePayload
+    }
+  }
+
+  async function handleConfirm() {
+    try {
+      const payload = buildApiPayload()
+
+      if (isEdit) {
+        await updateMutation.mutateAsync(payload as UpdateAffiliatePayload)
+      } else {
+        await createMutation.mutateAsync(payload as CreateAffiliatePayload)
+      }
+
+      // Success - clear draft and show success state
       clearFormDraft()
       setConfirmed(true)
+      toast.success(isEdit ? 'Affiliate updated successfully' : 'Affiliate created successfully')
+
+      // Redirect after a brief delay
       setTimeout(() => router.push('/dashboard/affiliates'), 1800)
-    }, 900)
+    } catch (error) {
+      console.error('Failed to save affiliate:', error)
+      toast.error(getApiErrorMessage(error, 'Failed to save affiliate'))
+    }
   }
 
   function handleSaveDraft() {
@@ -154,7 +233,7 @@ export default function ReviewAffiliatePage() {
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--surface-container-high)]"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-surface-high"
                   style={{ color: 'var(--primary)' }}
                   title="Edit personal details"
                 >
@@ -195,7 +274,7 @@ export default function ReviewAffiliatePage() {
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--surface-container-high)]"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-surface-high"
                   style={{ color: 'var(--primary)' }}
                   title="Edit bank details"
                 >
@@ -213,7 +292,7 @@ export default function ReviewAffiliatePage() {
                   <span className="text-sm font-mono font-semibold flex-1" style={{ color: 'var(--on-surface)' }}>
                     {maskedAccount}
                   </span>
-                  <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--tertiary)' }} />
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--tertiary)' }} />
                 </div>
                 <p className="text-xs mt-1 italic" style={{ color: 'var(--on-surface-variant)' }}>Securely encrypted for safety</p>
               </div>
@@ -238,7 +317,7 @@ export default function ReviewAffiliatePage() {
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[var(--primary-fixed)]"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-primary-fixed"
                 style={{ color: 'var(--primary)', background: 'var(--surface-container-low)' }}
               >
                 <Pencil className="w-3 h-3" />
@@ -254,11 +333,11 @@ export default function ReviewAffiliatePage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--on-surface-variant)' }}>Selected Product</p>
                   <p className="text-sm font-semibold" style={{ color: 'var(--on-surface)' }}>
-                    {linkedProducts.length > 0
-                      ? linkedProducts.length === 1
-                        ? linkedProducts[0].name
-                        : `${linkedProducts.length} products`
-                      : 'None selected'}
+                    {productsQuery.isLoading
+                      ? 'Loading...'
+                      : selectedProduct
+                        ? selectedProduct.title
+                        : 'Product not found'}
                   </p>
                 </div>
                 <div>
@@ -349,7 +428,7 @@ export default function ReviewAffiliatePage() {
             className="flex items-start gap-3 p-4 rounded-xl"
             style={{ background: 'var(--primary-fixed)', color: 'var(--on-primary-fixed)' }}
           >
-            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 opacity-70" />
+            <Info className="w-4 h-4 shrink-0 mt-0.5 opacity-70" />
             <p className="text-xs leading-relaxed">
               By clicking <strong>Confirm & Create Affiliate</strong>, you agree to the standard partnership terms and will automatically trigger a welcome email containing the unique tracking link and portal login credentials to <strong>{data.fullName}</strong>.
             </p>

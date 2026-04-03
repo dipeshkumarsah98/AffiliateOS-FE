@@ -20,12 +20,7 @@ export type OrderStatus =
 
 export type PaymentMethod = "online" | "cod";
 
-export type AffiliateType =
-  | "influencer"
-  | "creator"
-  | "shop_owner"
-  | "blogger"
-  | "other";
+export type AffiliateType = "influencer" | "reseller" | "referral" | "partner";
 
 export interface StockMovement {
   id: string;
