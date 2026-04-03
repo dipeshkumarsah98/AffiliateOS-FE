@@ -2,6 +2,177 @@ import { apiClient } from "./client";
 import type { Order } from "../types";
 import type { OrderFormData } from "../order-form-store";
 
+// ── Order Detail types ──────────────────────────────────────────────────────
+
+export interface OrderDetailProduct {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  price: number;
+  images: string[];
+  totalStock: number;
+  status: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface OrderDetailItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  product: OrderDetailProduct;
+}
+
+export interface OrderAddress {
+  id: string;
+  userId: string;
+  addressType: "shipping" | "billing";
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface OrderPayment {
+  id: string;
+  orderId: string;
+  paymentMethod: string;
+  provider: string;
+  amount: number;
+  currency: string;
+  transactionId: string | null;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface OrderVerification {
+  id: string;
+  orderId: string;
+  verifiedBy: string | null;
+  verificationStatus: string;
+  customerResponse: string | null;
+  remarks: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+}
+
+export interface OrderStatusEntry {
+  status: string;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+export interface OrderDetailResponse {
+  id: string;
+  userId: string;
+  orderNumber: string;
+  status: string;
+  affiliateId: string | null;
+  subtotal: number;
+  taxAmount: number;
+  shippingAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+  currency: string;
+  shippingAddressId: string;
+  billingAddressId: string;
+  paymentMethod: string;
+  notes: string | null;
+  updatedAt: string;
+  createdAt: string;
+  createdBy: string | null;
+  items: OrderDetailItem[];
+  user: { email: string; name: string };
+  payment: OrderPayment | null;
+  verification: OrderVerification | null;
+  earnings: {
+    id: string;
+    orderId: string;
+    affiliateId: string;
+    amount: number;
+    status: string;
+    createdAt: string;
+  }[];
+  affiliate: { id: string; fullName: string; affiliateCode: string } | null;
+  shippingAddress: OrderAddress | null;
+  billingAddress: OrderAddress | null;
+  statuses?: OrderStatusEntry[];
+}
+
+export interface OrderStatsResponse {
+  totalOrders: number;
+  processingOrders: number;
+  grossRevenue: number;
+  cancellations: number;
+}
+
+export interface OrderListItem {
+  id: string;
+  userId: string;
+  orderNumber: string;
+  status: string;
+  affiliateId: string | null;
+  subtotal: number;
+  taxAmount: number;
+  shippingAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+  currency: string;
+  shippingAddressId: string;
+  billingAddressId: string;
+  paymentMethod: string;
+  notes: string | null;
+  additionalInfo: any;
+  updatedAt: string;
+  createdAt: string;
+  createdBy: string | null;
+  user: {
+    email: string;
+    name: string;
+  };
+  items: {
+    id: string;
+    orderId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    product: {
+      id: string;
+      title: string;
+    };
+  }[];
+  payment: {
+    paymentMethod: string;
+    amount: number;
+    status: string;
+    paidAt: string | null;
+  };
+}
+
+export interface OrdersListResponse {
+  items: OrderListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface FetchOrdersParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
 export interface CreateOrderResponse {
   message: string;
   order: Order;
@@ -47,7 +218,34 @@ export async function validateAffiliateCodeAPI(
   return res;
 }
 
-export async function fetchOrderDetails(id: string): Promise<Order> {
-  const { data: res } = await apiClient.get<{ order: Order }>(`/orders/${id}`);
-  return res.order;
+export async function fetchOrderDetails(
+  id: string,
+): Promise<OrderDetailResponse> {
+  const { data } = await apiClient.get<OrderDetailResponse>(`/orders/${id}`);
+  return data;
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: string,
+): Promise<OrderDetailResponse> {
+  const { data } = await apiClient.patch<OrderDetailResponse>(
+    `/orders/${orderId}/status`,
+    { status },
+  );
+  return data;
+}
+
+export async function fetchOrderStats(): Promise<OrderStatsResponse> {
+  const { data } = await apiClient.get<OrderStatsResponse>("/orders/stats");
+  return data;
+}
+
+export async function fetchOrders(
+  params?: FetchOrdersParams,
+): Promise<OrdersListResponse> {
+  const { data } = await apiClient.get<OrdersListResponse>("/orders", {
+    params,
+  });
+  return data;
 }

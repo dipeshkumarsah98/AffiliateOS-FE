@@ -5,13 +5,35 @@ import { toast } from "sonner";
 import { useApiMutation, queryKeys } from "./use-query";
 import {
   createOrder,
-  CreateOrderPayload,
+  fetchOrderDetails,
+  updateOrderStatus,
   validateAffiliateCodeAPI,
+  fetchOrders,
+  fetchOrderStats,
+} from "@/lib/api/orders";
+import type {
+  CreateOrderPayload,
+  FetchOrdersParams,
+  OrderDetailResponse,
 } from "@/lib/api/orders";
 import type { OrderFormData } from "@/lib/order-form-store";
 import { clearOrderFormDraft } from "@/lib/order-form-store";
 import { useRouter } from "next/navigation";
 import type { Order } from "@/lib/types";
+
+export function useOrdersQuery(params?: FetchOrdersParams) {
+  return useQuery({
+    queryKey: [...queryKeys.orders.list(params as Record<string, unknown>)],
+    queryFn: () => fetchOrders(params),
+  });
+}
+
+export function useOrderStatsQuery() {
+  return useQuery({
+    queryKey: [...queryKeys.orders.all(), "stats"],
+    queryFn: () => fetchOrderStats(),
+  });
+}
 
 export function useValidateAffiliateCode(code: string) {
   return useQuery({
@@ -54,6 +76,34 @@ export function useCreateOrder() {
         error?.response?.data?.message ||
           error?.message ||
           "Failed to create order",
+      );
+    },
+  });
+}
+
+export function useOrderDetailQuery(id: string) {
+  return useQuery({
+    queryKey: [...queryKeys.orders.detail(id)],
+    queryFn: () => fetchOrderDetails(id),
+    enabled: !!id,
+  });
+}
+
+export function useUpdateOrderStatus() {
+  return useApiMutation<
+    OrderDetailResponse,
+    { orderId: string; status: string }
+  >({
+    mutationFn: ({ orderId, status }) => updateOrderStatus(orderId, status),
+    invalidateKeys: [[...queryKeys.orders.all()]],
+    onSuccess: () => {
+      toast.success("Order status updated");
+    },
+    onError: (error: any) => {
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to update status",
       );
     },
   });

@@ -8,6 +8,7 @@ import { useProductsQuery } from '@/hooks/use-products'
 import type { ProductListItem } from '@/lib/api/products'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
 import {
     Table,
     TableBody,
@@ -19,6 +20,7 @@ import { ProductDetailDialog } from '@/components/dashboard/products/ProductDeta
 import { ProductsPagination } from '@/components/dashboard/products/ProductsPagination'
 import { ProductsTableBody } from '@/components/dashboard/products/ProductsTableBody'
 import { Search, X, Package, Eye, AlertTriangle, RefreshCw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 5
 
@@ -67,139 +69,71 @@ export default function ProductsPage() {
     }
 
     return (
-        <div className="flex flex-col min-h-screen" style={{ background: '#f8faff' }}>
+        <div className="flex flex-col min-h-screen bg-muted/20">
             <Topbar title="Products" description="Manage your product catalog" />
 
-            <div className="flex-1 p-4 md:p-8 max-w-360">
-                <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between mb-6 md:mb-8">
-                    <div>
-                        <h1
-                            className="text-2xl md:text-3xl font-bold text-balance"
-                            style={{
-                                fontFamily: 'var(--font-display)',
-                                color: '#0f1623',
-                                letterSpacing: '-0.02em',
-                            }}
-                        >
-                            Product Inventory
-                        </h1>
-                        <p
-                            className="text-sm mt-1.5 max-w-md hidden sm:block"
-                            style={{ color: '#6b7280', lineHeight: '1.5' }}
-                        >
-                            Browse your live catalog, search backend records, and manage stock operations from a
-                            single inventory view.
-                        </p>
-                    </div>
-                </div>
-
+            <div className="flex-1 p-4 md:p-8 max-w-screen-2xl mx-auto w-full">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-5 md:mb-6">
-                    <div
-                        className="flex items-center gap-4 px-6 py-5 rounded-2xl"
-                        style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)', minWidth: '180px' }}
-                    >
-                        <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ background: '#eef2ff' }}
-                        >
-                            <Package className="w-5 h-5" style={{ color: '#2b4bb9' }} />
-                        </div>
-                        <div>
-                            <p
-                                className="text-xs font-semibold uppercase tracking-wider mb-0.5"
-                                style={{ color: '#9ca3af' }}
-                            >
-                                Total Products
-                            </p>
-                            <p
-                                className="text-2xl font-bold"
-                                style={{
-                                    fontFamily: 'var(--font-display)',
-                                    color: '#0f1623',
-                                    letterSpacing: '-0.03em',
-                                }}
-                            >
-                                {totalProducts.toLocaleString()}
-                            </p>
-                        </div>
-                    </div>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 px-6 py-5">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary/10">
+                                <Package className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-0.5 text-muted-foreground">
+                                    Total Products
+                                </p>
+                                <p className="text-2xl font-bold tracking-tight text-foreground">
+                                    {totalProducts.toLocaleString()}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                    <div
-                        className="flex items-center gap-4 px-6 py-5 rounded-2xl"
-                        style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)', minWidth: '180px' }}
-                    >
-                        <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ background: '#fef2f2' }}
-                        >
-                            <AlertTriangle className="w-5 h-5" style={{ color: '#dc2626' }} />
-                        </div>
-                        <div>
-                            <p
-                                className="text-xs font-semibold uppercase tracking-wider mb-0.5"
-                                style={{ color: '#9ca3af' }}
-                            >
-                                Low Stock In View
-                            </p>
-                            <p
-                                className="text-2xl font-bold"
-                                style={{
-                                    fontFamily: 'var(--font-display)',
-                                    color: '#dc2626',
-                                    letterSpacing: '-0.03em',
-                                }}
-                            >
-                                {lowStockCount}
-                            </p>
-                        </div>
-                    </div>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 px-6 py-5">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-destructive/10">
+                                <AlertTriangle className="w-5 h-5 text-destructive" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-0.5 text-muted-foreground">
+                                    Low Stock In View
+                                </p>
+                                <p className="text-2xl font-bold tracking-tight text-destructive">
+                                    {lowStockCount}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                    <div
-                        className="flex items-center gap-4 px-6 py-5 rounded-2xl"
-                        style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)' }}
-                    >
-                        <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ background: '#f0fdf4' }}
-                        >
-                            <Eye className="w-5 h-5" style={{ color: '#16a34a' }} />
-                        </div>
-                        <div>
-                            <p
-                                className="text-xs font-semibold uppercase tracking-wider mb-0.5"
-                                style={{ color: '#9ca3af' }}
-                            >
-                                Products In View
-                            </p>
-                            <p
-                                className="text-2xl font-bold"
-                                style={{
-                                    fontFamily: 'var(--font-display)',
-                                    color: '#16a34a',
-                                    letterSpacing: '-0.03em',
-                                }}
-                            >
-                                {inStockCount}/{products.length}
-                            </p>
-                        </div>
-                    </div>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 px-6 py-5">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/10">
+                                <Eye className="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider mb-0.5 text-muted-foreground">
+                                    Products In View
+                                </p>
+                                <p className="text-2xl font-bold tracking-tight text-emerald-600">
+                                    {inStockCount}/{products.length}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
-                <div
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl mb-5"
-                    style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)' }}
-                >
-                    <Search className="w-4 h-4 shrink-0" style={{ color: '#9ca3af' }} />
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl mb-5 border bg-card text-card-foreground shadow-sm">
+                    <Search className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <Input
                         value={search}
                         onChange={(e) => handleSearch(e.target.value)}
                         placeholder="Search by title or slug..."
-                        className="flex-1 text-sm bg-transparent border-0 shadow-none px-0 focus-visible:ring-0"
-                        style={{ color: '#0f1623' }}
+                        className="flex-1 text-sm bg-transparent border-0 shadow-none px-0 focus-visible:ring-0 text-foreground"
                     />
                     {productsQuery.isFetching ? (
-                        <div className="flex items-center gap-2 text-xs shrink-0" style={{ color: '#6b7280' }}>
-                            <RefreshCw className={`w-3.5 h-3.5 ${isFiltering ? 'animate-spin' : ''}`} />
+                        <div className="flex items-center gap-2 text-xs shrink-0 text-muted-foreground">
+                            <RefreshCw className={cn('w-3.5 h-3.5', isFiltering && 'animate-spin')} />
                             {isFiltering ? 'Searching...' : 'Syncing...'}
                         </div>
                     ) : null}
@@ -207,27 +141,23 @@ export default function ProductsPage() {
                         <Button
                             type="button"
                             variant="ghost"
-                            size="icon-sm"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground"
                             onClick={() => handleSearch('')}
-                            style={{ color: '#9ca3af' }}
                         >
                             <X className="w-4 h-4" />
                         </Button>
                     ) : null}
                 </div>
 
-                <div
-                    className="rounded-2xl overflow-hidden"
-                    style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)' }}
-                >
+                <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
                     <Table className="w-full">
                         <TableHeader>
-                            <TableRow style={{ borderBottom: '1px solid #f4f5ff', background: '#fafbff' }}>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
                                 {['ID', 'Product', 'Status', 'Stock Level', 'Pricing', 'Actions'].map((label) => (
                                     <TableHead
                                         key={label}
-                                        className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider"
-                                        style={{ color: '#9ca3af' }}
+                                        className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground"
                                     >
                                         {label}
                                     </TableHead>

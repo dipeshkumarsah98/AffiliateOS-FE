@@ -1,0 +1,230 @@
+'use client'
+
+import { useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+
+import { ArrowLeft, RefreshCw, AlertCircle, Link2 } from 'lucide-react'
+
+import { Topbar } from '@/components/layout/Topbar'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatusPill } from '@/components/dashboard/orders/StatusPill'
+import { OrderTimeline } from '@/components/dashboard/orders/OrderTimeline'
+import { OrderItemsTable } from '@/components/dashboard/orders/OrderItemsTable'
+import { OrderPricingBreakdown } from '@/components/dashboard/orders/OrderPricingBreakdown'
+import { OrderAddressCard } from '@/components/dashboard/orders/OrderAddressCard'
+import { OrderPaymentCard } from '@/components/dashboard/orders/OrderPaymentCard'
+import { OrderCustomerCard } from '@/components/dashboard/orders/OrderCustomerCard'
+import { OrderVerificationCard } from '@/components/dashboard/orders/OrderVerificationCard'
+import { UpdateStatusDialog } from '@/components/dashboard/orders/UpdateStatusDialog'
+
+import { useOrderDetailQuery } from '@/hooks/use-orders'
+import { useAuthStore } from '@/stores/auth-store'
+import { formatRelative } from 'date-fns'
+
+const TERMINAL_STATUSES = ['COMPLETED', 'CANCELLED']
+
+function OrderDetailSkeleton() {
+    return (
+        <div className="w-full space-y-6 animate-pulse">
+            <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-72" />
+                <Skeleton className="h-6 w-24 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-80" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Skeleton className="h-56 w-full rounded-xl" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Skeleton className="h-32 w-full rounded-xl" />
+                        <Skeleton className="h-32 w-full rounded-xl" />
+                    </div>
+                    <Skeleton className="h-44 w-full rounded-xl" />
+                    <Skeleton className="h-36 w-full rounded-xl" />
+                </div>
+                <div className="space-y-6">
+                    <Skeleton className="h-72 w-full rounded-xl" />
+                    <Skeleton className="h-44 w-full rounded-xl" />
+                    <Skeleton className="h-28 w-full rounded-xl" />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default function OrderDetailPage() {
+    const params = useParams<{ id: string }>()
+    const router = useRouter()
+    const currentUser = useAuthStore((s) => s.currentUser)
+    const isAdmin = currentUser?.roles.includes('admin') ?? false
+
+    const { data: order, isLoading, isError, refetch } = useOrderDetailQuery(params.id)
+    const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+
+    const canUpdateStatus =
+        isAdmin && order && !TERMINAL_STATUSES.includes(order.status.toUpperCase())
+
+    return (
+        <>
+            <Topbar title="Order Details" />
+
+            <main className="flex-1 p-4 md:p-8 max-w-screen-2xl mx-auto w-full">
+                <button
+                    onClick={() => router.push('/dashboard/orders')}
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-5 transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Orders
+                </button>
+
+                {isLoading && <OrderDetailSkeleton />}
+
+                {isError && (
+                    <Card className="py-12">
+                        <CardContent className="flex flex-col items-center text-center gap-3">
+                            <AlertCircle className="w-10 h-10 text-destructive" />
+                            <p className="text-lg font-semibold">Failed to load order</p>
+                            <p className="text-sm text-muted-foreground mb-2">
+                                Something went wrong while fetching the order details.
+                            </p>
+                            <Button variant="outline" onClick={() => refetch()}>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Retry
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {order && (
+                    <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3 mb-1">
+                                    <h1 className="text-2xl font-bold tracking-tight">
+                                        Order #{order.orderNumber}
+                                    </h1>
+                                    <StatusPill status={order.status} />
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Placed on{' '}
+                                    {formatRelative(new Date(order.createdAt), new Date())}
+                                </p>
+                            </div>
+
+                            <div className='flex flex-row gap-2'>
+
+                                <Button variant="outline" >
+                                    Print Invoice
+                                </Button>
+                                {canUpdateStatus && (
+                                    <Button onClick={() => setStatusDialogOpen(true)}>
+                                        Update Status
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── Content grid ── */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Left column */}
+                            <div className="lg:col-span-2 space-y-6">
+                                <OrderItemsTable items={order.items} currency={order.currency} />
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <OrderCustomerCard
+                                        name={order.user.name}
+                                        email={order.user.email}
+                                    />
+                                    <OrderPaymentCard
+                                        payment={order.payment}
+                                        paymentMethod={order.paymentMethod}
+                                        currency={order.currency}
+                                    />
+                                </div>
+
+                                <OrderPricingBreakdown
+                                    subtotal={order.subtotal}
+                                    taxAmount={order.taxAmount}
+                                    shippingAmount={order.shippingAmount}
+                                    discountAmount={order.discountAmount}
+                                    totalAmount={order.totalAmount}
+                                    currency={order.currency}
+                                />
+
+                                <OrderAddressCard
+                                    label="Shipping Address"
+                                    address={order.shippingAddress}
+                                />
+
+                                {order.notes && (
+                                    <Card className="py-4">
+                                        <CardHeader className="pb-0">
+                                            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                Notes
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+
+                            {/* Right column */}
+                            <div className="space-y-6">
+                                <Card className="py-4">
+                                    <CardHeader className="pb-0">
+                                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                            Order Journey
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <OrderTimeline
+                                            currentStatus={order.status}
+                                            createdAt={order.createdAt}
+                                            statuses={order.statuses}
+                                        />
+                                    </CardContent>
+                                </Card>
+
+                                {order.verification && (
+                                    <OrderVerificationCard verification={order.verification} />
+                                )}
+
+                                {order.affiliate && (
+                                    <Card className="py-4">
+                                        <CardHeader className="pb-0">
+                                            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                                <Link2 className="w-3.5 h-3.5" />
+                                                Affiliate
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-1.5">
+                                            <p className="text-sm font-medium">
+                                                {order.affiliate.fullName}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground font-mono">
+                                                {order.affiliate.affiliateCode}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Status update dialog */}
+                        {canUpdateStatus && (
+                            <UpdateStatusDialog
+                                open={statusDialogOpen}
+                                onOpenChange={setStatusDialogOpen}
+                                orderId={order.id}
+                                currentStatus={order.status}
+                            />
+                        )}
+                    </div>
+                )}
+            </main>
+        </>
+    )
+}
