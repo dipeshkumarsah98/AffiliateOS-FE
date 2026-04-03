@@ -178,7 +178,11 @@ export interface CreateOrderResponse {
   order: Order;
 }
 
-export type CreateOrderPayload = Omit<OrderFormData, "sameAsShipping"> & {
+export type CreateOrderPayload = Omit<
+  OrderFormData,
+  "sameAsShipping" | "customerMode"
+> & {
+  userId?: string;
   billingAddress: OrderFormData["sameAsShipping"] extends true
     ? OrderFormData["shippingAddress"]
     : OrderFormData["billingAddress"];

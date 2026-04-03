@@ -16,6 +16,8 @@ export interface OrderItemInput {
 
 export interface OrderFormData {
   // Customer Information
+  customerMode: "existing" | "new";
+  customerId?: string;
   customerEmail: string;
   customerName: string;
   customerPhone: string;

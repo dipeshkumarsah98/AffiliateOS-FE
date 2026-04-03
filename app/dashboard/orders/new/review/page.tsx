@@ -14,6 +14,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Topbar } from "@/components/layout/Topbar";
 import { loadOrderFormDraft, type OrderFormData } from "@/lib/order-form-store";
 import { useCreateOrder } from "@/hooks/use-orders";
@@ -68,10 +69,10 @@ export default function ReviewOrderPage() {
   }, 0);
 
   // Hardcoded for now. Could calculate shipping based on regions, or call API
-  const shipping = 0; 
+  const shipping = 0;
   // We can apply discount if affiliateCode exists but that would be validated backend-side most likely
-  const discount = 0; 
-  
+  const discount = 0;
+
   const total = subtotal + shipping - discount;
 
   const handleSubmit = () => {
@@ -99,7 +100,12 @@ export default function ReviewOrderPage() {
               {/* Customer Info */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Customer Details</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Customer Details</CardTitle>
+                    {draft.customerId && (
+                      <Badge variant="secondary">Existing Customer</Badge>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -124,11 +130,21 @@ export default function ReviewOrderPage() {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1 rounded-md bg-muted/50 p-4 border border-border">
-                    <span className="font-semibold block mb-1">Shipping Address</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold">Shipping Address</span>
+                      {draft.shippingAddressId && (
+                        <Badge variant="outline" className="text-xs">Saved</Badge>
+                      )}
+                    </div>
                     <p className="text-muted-foreground">{formatAddress(draft.shippingAddress)}</p>
                   </div>
                   <div className="space-y-1 rounded-md bg-muted/50 p-4 border border-border">
-                    <span className="font-semibold block mb-1">Billing Address</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold">Billing Address</span>
+                      {draft.billingAddressId && (
+                        <Badge variant="outline" className="text-xs">Saved</Badge>
+                      )}
+                    </div>
                     <p className="text-muted-foreground">
                       {draft.sameAsShipping ? "Same as shipping" : formatAddress(draft.billingAddress)}
                     </p>
@@ -163,29 +179,29 @@ export default function ReviewOrderPage() {
 
               {/* Additional Information */}
               {(draft.affiliateCode || draft.notes) && (
-                 <Card>
-                   <CardHeader>
-                     <CardTitle>Additional Info</CardTitle>
-                   </CardHeader>
-                   <CardContent className="space-y-4 text-sm">
-                      {draft.affiliateCode && (
-                        <div>
-                          <span className="text-muted-foreground font-medium">Affiliate Code:</span>
-                          <p className="inline-block px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded ml-2">
-                            {draft.affiliateCode}
-                          </p>
-                        </div>
-                      )}
-                      {draft.notes && (
-                         <div>
-                           <span className="text-muted-foreground font-medium">Notes:</span>
-                           <p className="mt-1 p-3 bg-muted/50 rounded-md border text-muted-foreground italic">
-                             {draft.notes}
-                           </p>
-                         </div>
-                      )}
-                   </CardContent>
-                 </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Additional Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-sm">
+                    {draft.affiliateCode && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Affiliate Code:</span>
+                        <p className="inline-block px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded ml-2">
+                          {draft.affiliateCode}
+                        </p>
+                      </div>
+                    )}
+                    {draft.notes && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Notes:</span>
+                        <p className="mt-1 p-3 bg-muted/50 rounded-md border text-muted-foreground italic">
+                          {draft.notes}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
 
             </div>
@@ -198,46 +214,46 @@ export default function ReviewOrderPage() {
                   <CardDescription>Review total amount</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                   <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>RS {subtotal.toFixed(2)}</span>
-                   </div>
-                   <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Shipping</span>
-                      <span>{shipping > 0 ? `RS ${shipping.toFixed(2)}` : "Free"}</span>
-                   </div>
-                   {discount > 0 && (
-                     <div className="flex justify-between items-center text-sm text-green-600">
-                        <span>Discount</span>
-                        <span>-RS {discount.toFixed(2)}</span>
-                     </div>
-                   )}
-                   <div className="pt-4 border-t flex justify-between items-center font-bold">
-                     <span>Total</span>
-                     <span className="text-lg">RS {total.toFixed(2)}</span>
-                   </div>
-                   
-                   <div className="pt-4 space-y-1">
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Payment Method</span>
-                      <p className="font-medium">{draft.paymentMethod}</p>
-                   </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>RS {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span>{shipping > 0 ? `RS ${shipping.toFixed(2)}` : "Free"}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between items-center text-sm text-green-600">
+                      <span>Discount</span>
+                      <span>-RS {discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="pt-4 border-t flex justify-between items-center font-bold">
+                    <span>Total</span>
+                    <span className="text-lg">RS {total.toFixed(2)}</span>
+                  </div>
+
+                  <div className="pt-4 space-y-1">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Payment Method</span>
+                    <p className="font-medium">{draft.paymentMethod}</p>
+                  </div>
                 </CardContent>
                 <CardFooter>
-                   <Button 
-                      className="w-full" 
-                      size="lg" 
-                      onClick={handleSubmit}
-                      disabled={createOrderMutation.isPending}
-                   >
-                     {createOrderMutation.isPending ? (
-                        "Processing..."
-                     ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Confirm & Create Order
-                        </>
-                     )}
-                   </Button>
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={handleSubmit}
+                    disabled={createOrderMutation.isPending}
+                  >
+                    {createOrderMutation.isPending ? (
+                      "Processing..."
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Confirm & Create Order
+                      </>
+                    )}
+                  </Button>
                 </CardFooter>
               </Card>
             </div>

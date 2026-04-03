@@ -61,6 +61,11 @@ export function useCreateOrder() {
         paymentMethod: data.paymentMethod,
         affiliateCode: data.affiliateCode || undefined,
         notes: data.notes || undefined,
+        // Include user and address IDs if existing customer/addresses were selected
+        userId: data.customerId,
+        shippingAddressId: data.shippingAddressId,
+        billingAddressId: data.billingAddressId,
+        customerId: data.customerId,
       };
 
       return createOrder(payload);
