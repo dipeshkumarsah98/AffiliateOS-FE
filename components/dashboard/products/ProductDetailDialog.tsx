@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/stores/auth-store'
 import type { ProductListItem } from '@/lib/api/products'
-import { formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -71,7 +71,7 @@ export function ProductDetailDialog({
                                 className="text-xl font-bold"
                                 style={{ color: '#2b4bb9', fontFamily: 'var(--font-display)' }}
                             >
-                                NRP {product.price.toFixed(2)}
+                                {formatCurrency(product.price, "NPR")}
                             </DialogDescription>
                         </DialogHeader>
 

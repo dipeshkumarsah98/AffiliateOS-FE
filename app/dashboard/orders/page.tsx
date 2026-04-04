@@ -22,7 +22,7 @@ import { OrderDetailModal } from '@/components/dashboard/orders/OrderDetailModal
 import { format } from 'date-fns'
 import { useDebounce } from '@/hooks/use-debounce'
 import { formatRelative } from '@/lib/stock-utils'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -105,13 +105,6 @@ export default function OrdersPage() {
   const cancelled = statsQuery.data?.cancellations ?? 0
   const cancellationRate = totalOrders > 0 ? ((cancelled / totalOrders) * 100).toFixed(1) : "0.0"
 
-  const affiliateOptions: { value: string; label: string }[] = [
-    { value: 'all', label: 'All Affiliates' },
-    ...DUMMY_AFFILIATES.map(a => ({ value: a.affiliateCode, label: a.fullName })),
-    { value: 'direct', label: 'Direct Traffic' },
-  ]
-
-  // Pagination Data
   const orders = ordersQuery.data?.items ?? []
   const totalItems = ordersQuery.data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
@@ -322,7 +315,7 @@ export default function OrdersPage() {
                     </TableCell>
                     <TableCell className="py-4 px-6">
                       <span className="text-sm font-bold tabular-nums" style={{ color: '#2b4bb9' }}>
-                        {order.currency} {order.totalAmount.toFixed(2)}
+                        {formatCurrency(order.totalAmount, order.currency)}
                       </span>
                     </TableCell>
                     <TableCell className="py-4 px-6">

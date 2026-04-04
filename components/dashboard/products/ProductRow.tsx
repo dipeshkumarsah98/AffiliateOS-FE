@@ -1,5 +1,5 @@
 import type { ProductListItem } from '@/lib/api/products'
-import { formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TableCell, TableRow } from '@/components/ui/table'
@@ -10,6 +10,7 @@ import {
     statusBadge,
     stockHealth,
 } from '@/components/dashboard/products/helpers'
+import { formatRelative } from 'date-fns'
 
 type ProductRowProps = {
     product: ProductListItem
@@ -85,10 +86,10 @@ export function ProductRow({ product, onView, onEdit, onStock }: ProductRowProps
 
             <TableCell className="py-5 px-6">
                 <p className="text-sm font-bold tabular-nums" style={{ color: '#2b4bb9' }}>
-                    NRP {product.price.toFixed(2)}
+                    {formatCurrency(product.price, "NPR")}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>
-                    Updated {formatDate(product.updatedAt)}
+                    Updated {formatRelative(new Date(product.updatedAt), new Date())}
                 </p>
             </TableCell>
 

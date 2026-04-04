@@ -16,3 +16,11 @@ export function formatDate(
 ) {
   return new Intl.DateTimeFormat(locale, options).format(new Date(value));
 }
+
+export function formatCurrency(amount: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency || "USD",
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
