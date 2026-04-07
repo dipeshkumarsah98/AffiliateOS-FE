@@ -24,7 +24,6 @@ import { useDebounce } from '@/hooks/use-debounce'
 import { formatRelative } from '@/lib/stock-utils'
 import { cn, formatCurrency } from '@/lib/utils'
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 5
 
@@ -247,8 +246,7 @@ export default function OrdersPage() {
             </TableHeader>
             <TableBody>
               {orders.map((order) => {
-                const aff = DUMMY_AFFILIATES.find(a => a.affiliateCode === order.affiliateId)
-                const isDirect = !order.affiliateId
+                const isDirect = !order.affiliateId;
 
                 return (
                   <TableRow
@@ -304,13 +302,11 @@ export default function OrdersPage() {
                     <TableCell className="py-4 px-6">
                       {isDirect ? (
                         <span className="text-sm italic" style={{ color: '#9ca3af' }}>Direct Traffic</span>
-                      ) : aff ? (
-                        <div className="flex items-center gap-2">
-                          <AffiliateAvatar name={aff.fullName} />
-                          <span className="text-sm font-medium" style={{ color: '#0f1623' }}>{aff.fullName}</span>
-                        </div>
                       ) : (
-                        <span className="text-xs font-mono" style={{ color: '#9ca3af' }}>{order.affiliateId}</span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+                          <Package className="w-3 h-3" />
+                          Affiliated
+                        </span>
                       )}
                     </TableCell>
                     <TableCell className="py-4 px-6">

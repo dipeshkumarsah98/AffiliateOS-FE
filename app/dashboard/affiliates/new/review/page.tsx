@@ -12,7 +12,8 @@ import { useProductsQuery } from '@/hooks/use-products'
 import { useCreateAffiliate, useUpdateAffiliate } from '@/hooks/use-affiliates'
 import { loadFormDraft, clearFormDraft } from '@/lib/affiliate-form-store'
 import type { AffiliateFormData } from '@/lib/affiliate-form-store'
-import type { CreateAffiliatePayload, UpdateAffiliatePayload, AffiliateTypeAPI, DiscountTypeAPI, CommissionTypeAPI } from '@/lib/api/affiliates'
+import type { CreateAffiliatePayload, CreateAffiliateWithNewVendor, CreateAffiliateWithExistingVendor, UpdateAffiliatePayload, AffiliateTypeAPI, DiscountTypeAPI, CommissionTypeAPI } from '@/lib/api/affiliates'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { getApiErrorMessage } from '@/lib/api/client'
 
@@ -115,20 +116,36 @@ export default function ReviewAffiliatePage() {
       return {
         affiliate: affiliatePayload,
       } as UpdateAffiliatePayload
+    } else if (data.vendorMode === 'existing' && data.vendorId) {
+      // Existing vendor: send vendorId + affiliate
+      return {
+        vendorId: data.vendorId,
+        vendor: {
+          bankName: data.bankName,
+          accountNumber: data.accountNumber,
+          affiliateType: affiliateTypeMap[data.affiliateType],
+        },
+        affiliate: affiliatePayload,
+      } as CreateAffiliateWithExistingVendor
     } else {
-      // For create, send both vendor and affiliate
+      // New vendor: send full vendor object + affiliate
       return {
         vendor: {
           name: data.fullName,
           email: data.email,
           affiliateType: affiliateTypeMap[data.affiliateType],
           contact: data.contactNumber,
-          address: data.physicalAddress,
+          address: {
+            street_address: data.streetAddress,
+            city: data.city,
+            state: data.state,
+            postal_code: data.postalCode,
+          },
           bankName: data.bankName,
           accountNumber: data.accountNumber,
         },
         affiliate: affiliatePayload,
-      } as CreateAffiliatePayload
+      } as CreateAffiliateWithNewVendor
     }
   }
 
@@ -226,7 +243,12 @@ export default function ReviewAffiliatePage() {
                     <User className="w-4 h-4" style={{ color: 'var(--on-primary-fixed)' }} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--on-surface)', letterSpacing: '-0.02em' }}>Personal Details</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--on-surface)', letterSpacing: '-0.02em' }}>Personal Details</p>
+                      {data.vendorMode === 'existing' && (
+                        <Badge variant="secondary" className="text-xs text-white">Existing Vendor</Badge>
+                      )}
+                    </div>
                     <p className="text-xs" style={{ color: 'var(--on-surface-variant)' }}>Contact and identity information</p>
                   </div>
                 </div>
@@ -257,7 +279,14 @@ export default function ReviewAffiliatePage() {
                 <ReviewRow label="Email Address" value={data.email} />
                 <ReviewRow label="Contact Number" value={data.contactNumber || '—'} />
               </div>
-              <ReviewRow label="Physical Address" value={data.physicalAddress || '—'} />
+              <ReviewRow
+                label="Address"
+                value={
+                  [data.streetAddress, data.city, data.state, data.postalCode]
+                    .filter(Boolean)
+                    .join(', ') || '—'
+                }
+              />
             </div>
 
             {/* Bank Details (narrower) */}

@@ -37,9 +37,9 @@ export function Topbar({ title, description }: TopbarProps) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  function handleLogout() {
+  async function handleLogout() {
     setOpen(false)
-    logout()
+    await logout()
     router.push('/login')
   }
 

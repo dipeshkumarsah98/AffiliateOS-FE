@@ -190,7 +190,7 @@ export default function CodVerificationsPage() {
                                 value={statsData?.totalCODOrders ?? 0}
                                 icon={
                                     <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary-container)' }}>
-                                        <Package className="w-5 h-5" style={{ color: 'var(--primary)' }} />
+                                        <Package className="w-5 h-5 text-white" />
                                     </div>
                                 }
                             />

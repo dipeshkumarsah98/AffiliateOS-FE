@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import * as z from 'zod'
 import {
-    AlertCircle,
     ArrowLeft,
     Building2,
     CheckCircle2,
@@ -46,6 +45,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Topbar } from '@/components/layout/Topbar'
+import { VendorSelector } from '@/components/dashboard/affiliates/VendorSelector'
+
 import { useAuthStore } from '@/stores/auth-store'
 import { useProductsQuery } from '@/hooks/use-products'
 import { useAffiliateDetail, useGenerateAffiliateCode } from '@/hooks/use-affiliates'
@@ -57,14 +58,21 @@ import {
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { getApiErrorMessage } from '@/lib/api/client'
+import { Address } from '@/lib/api/orders'
 
 // Validation schema
 const affiliateFormSchema = z.object({
+    vendorMode: z.enum(['existing', 'new']),
+    vendorId: z.string().optional(),
+    draftVendorInfo: z.any().optional(),
     fullName: z.string().min(1, 'Full name is required'),
     email: z.string().email('Enter a valid email address'),
     affiliateType: z.enum(['influencer', 'reseller', 'referral', 'partner']),
     contactNumber: z.string(),
-    physicalAddress: z.string(),
+    streetAddress: z.string(),
+    city: z.string(),
+    state: z.string(),
+    postalCode: z.string(),
     selectedProductId: z.string().min(1, 'Please select a product'),
     affiliateCode: z.string().min(1, 'Affiliate code is required'),
     discountType: z.enum(['fixed', 'percentage']),
@@ -86,7 +94,10 @@ const affiliateFormSchema = z.object({
     bankName: z.string(),
     accountNumber: z.string(),
     editId: z.string().optional(),
-})
+}).refine(
+    (data) => data.vendorMode === 'new' || (data.vendorMode === 'existing' && data.vendorId),
+    { message: 'Please select a vendor', path: ['vendorId'] }
+)
 
 type FormValues = z.infer<typeof affiliateFormSchema>
 
@@ -95,6 +106,33 @@ function toNonNegativeString(value: string) {
     const parsed = Number(value)
     if (Number.isNaN(parsed)) return ''
     return String(Math.max(0, parsed))
+}
+
+const DEFAULT_FORM_VALUES: FormValues = {
+    vendorMode: 'new',
+    vendorId: undefined,
+    draftVendorInfo: undefined,
+    fullName: '',
+    email: '',
+    affiliateType: 'influencer' as const,
+    contactNumber: '',
+    streetAddress: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    selectedProductId: '',
+    affiliateCode: '',
+    discountType: 'fixed' as const,
+    discountValue: '',
+    commissionType: 'percentage' as const,
+    commissionValue: '',
+    bankName: '',
+    accountNumber: '',
+    editId: undefined,
+}
+
+function selectAddressFromUserAddresses(addresses: Address[]) {
+    return addresses.find(a => a.addressType === 'billing') ?? addresses[0] ?? null
 }
 
 export default function NewAffiliatePage() {
@@ -108,7 +146,7 @@ export default function NewAffiliatePage() {
     // Fetch products from backend
     const productsQuery = useProductsQuery({
         page: 1,
-        limit: 1000, // Fetch all products for selection
+        limit: 1000,
         search: productSearch.trim() || undefined,
     })
 
@@ -124,33 +162,16 @@ export default function NewAffiliatePage() {
         resolver: zodResolver(affiliateFormSchema),
         defaultValues: (() => {
             const draft = loadFormDraft()
-            if (draft && draft.editId === editId) return draft
-
-            // existingAffiliate will be loaded from API, handled by useEffect below
-            if (false) {
-                // Placeholder for type inference
+            if (draft && draft.editId === editId) {
+                return {
+                    ...DEFAULT_FORM_VALUES,
+                    ...draft,
+                }
             }
-
-            return {
-                fullName: '',
-                email: '',
-                affiliateType: 'influencer' as const,
-                contactNumber: '',
-                physicalAddress: '',
-                selectedProductId: '',
-                affiliateCode: '',
-                discountType: 'fixed' as const,
-                discountValue: '0.00',
-                commissionType: 'percentage' as const,
-                commissionValue: '15',
-                bankName: '',
-                accountNumber: '',
-                editId: undefined,
-            }
+            return DEFAULT_FORM_VALUES
         })(),
     })
 
-    const fullName = form.watch('fullName')
     const discountType = form.watch('discountType')
     const commissionType = form.watch('commissionType')
     const selectedProductId = form.watch('selectedProductId')
@@ -164,17 +185,22 @@ export default function NewAffiliatePage() {
 
     // Restore draft data when navigating back from review page (create mode only)
     useEffect(() => {
-        // Only restore draft if NOT in edit mode
         if (!editId) {
             const draft = loadFormDraft()
             if (draft && !draft.editId) {
-                // Restore all form fields from draft
                 form.reset({
+                    ...DEFAULT_FORM_VALUES,
+                    vendorMode: draft.vendorMode ?? 'new',
+                    vendorId: draft.vendorId,
+                    draftVendorInfo: draft.draftVendorInfo,
                     fullName: draft.fullName,
                     email: draft.email,
                     affiliateType: draft.affiliateType,
                     contactNumber: draft.contactNumber,
-                    physicalAddress: draft.physicalAddress,
+                    streetAddress: draft.streetAddress,
+                    city: draft.city,
+                    state: draft.state,
+                    postalCode: draft.postalCode,
                     selectedProductId: draft.selectedProductId,
                     affiliateCode: draft.affiliateCode,
                     discountType: draft.discountType,
@@ -192,16 +218,21 @@ export default function NewAffiliatePage() {
     // Load existing affiliate data for edit mode
     useEffect(() => {
         if (existingAffiliate && editId) {
-            // First check if there's a draft for this editId (from review page)
             const draft = loadFormDraft()
             if (draft && draft.editId === editId) {
-                // Restore from draft (user came back from review page)
                 form.reset({
+                    ...DEFAULT_FORM_VALUES,
+                    vendorMode: draft.vendorMode ?? 'new',
+                    vendorId: draft.vendorId,
+                    draftVendorInfo: draft.draftVendorInfo,
                     fullName: draft.fullName,
                     email: draft.email,
                     affiliateType: draft.affiliateType,
                     contactNumber: draft.contactNumber,
-                    physicalAddress: draft.physicalAddress,
+                    streetAddress: draft.streetAddress,
+                    city: draft.city,
+                    state: draft.state,
+                    postalCode: draft.postalCode,
                     selectedProductId: draft.selectedProductId,
                     affiliateCode: draft.affiliateCode,
                     discountType: draft.discountType,
@@ -215,7 +246,6 @@ export default function NewAffiliatePage() {
                 return
             }
 
-            // No draft, load fresh data from API
             const affiliateTypeMap: Record<string, 'influencer' | 'reseller' | 'referral' | 'partner'> = {
                 INFLUENCER: 'influencer',
                 RESELLER: 'reseller',
@@ -228,12 +258,19 @@ export default function NewAffiliatePage() {
                 PERCENTAGE: 'percentage',
             }
 
+            const selectedAddress = selectAddressFromUserAddresses(existingAffiliate.vendor.addresses)
+
             form.reset({
+                ...DEFAULT_FORM_VALUES,
+                vendorMode: 'new',
                 fullName: existingAffiliate.vendor.name,
                 email: existingAffiliate.vendor.email,
                 affiliateType: affiliateTypeMap[existingAffiliate.vendor.extras.affiliateType] || 'influencer',
-                contactNumber: existingAffiliate.vendor.extras.contact || '',
-                physicalAddress: existingAffiliate.vendor.extras.address || '',
+                contactNumber: existingAffiliate.vendor.phone || '',
+                streetAddress: selectedAddress?.street_address || '',
+                city: selectedAddress?.city || '',
+                state: selectedAddress?.state || '',
+                postalCode: selectedAddress?.postal_code || '',
                 selectedProductId: existingAffiliate.productId,
                 affiliateCode: existingAffiliate.code,
                 discountType: discountTypeMap[existingAffiliate.discountType] || 'fixed',
@@ -268,9 +305,29 @@ export default function NewAffiliatePage() {
     const isLoadingProducts = productsQuery.isLoading
     const isSearchingProducts = productsQuery.isFetching && !productsQuery.isLoading
 
+    // Determine if bank details are auto-filled from vendor (read-only)
+
     function onSubmit(data: FormValues) {
         const formData: AffiliateFormData = {
-            ...data,
+            vendorMode: data.vendorMode,
+            vendorId: data.vendorId,
+            draftVendorInfo: data.draftVendorInfo,
+            fullName: data.fullName,
+            email: data.email,
+            affiliateType: data.affiliateType,
+            contactNumber: data.contactNumber,
+            streetAddress: data.streetAddress,
+            city: data.city,
+            state: data.state,
+            postalCode: data.postalCode,
+            selectedProductId: data.selectedProductId,
+            affiliateCode: data.affiliateCode,
+            discountType: data.discountType,
+            discountValue: data.discountValue,
+            commissionType: data.commissionType,
+            commissionValue: data.commissionValue,
+            bankName: data.bankName,
+            accountNumber: data.accountNumber,
             editId: editId ?? undefined,
         }
         saveFormDraft(formData)
@@ -278,7 +335,7 @@ export default function NewAffiliatePage() {
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-background">
+        <div className="flex flex-col min-h-screen bg-background placeholder:text-gray-400">
             <Topbar title={isEdit ? 'Edit Affiliate' : 'New Affiliate'} />
 
             <main className="flex-1 p-6 lg:p-8 max-w-3xl mx-auto w-full">
@@ -332,118 +389,130 @@ export default function NewAffiliatePage() {
                 {!isLoadingAffiliate && (
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                            {/* Personal Details Section */}
-                            <Card className="shadow-sm">
-                                <CardHeader className="border-b">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                                            <User className="w-5 h-5 text-primary" />
-                                        </div>
-                                        <div>
-                                            <CardTitle className="text-base">Personal Details</CardTitle>
-                                            <CardDescription className="text-xs mt-0.5">
-                                                Identification and contact information.
-                                            </CardDescription>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="pt-6 space-y-5">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="fullName"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Full Name *</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="e.g. Ram Bahadur" {...field} disabled={isEdit} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
 
-                                        <FormField
-                                            control={form.control}
-                                            name="email"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Email Address *</FormLabel>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="email"
-                                                            placeholder="ram@example.com.np"
-                                                            {...field}
-                                                            disabled={isEdit}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="affiliateType"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Affiliate Type</FormLabel>
-                                                    <Select value={field.value} onValueChange={field.onChange} disabled={isEdit}>
+                            {/* Vendor Selection (create mode) / Read-only Personal Details (edit mode) */}
+                            {isEdit ? (
+                                /* Edit mode: show read-only personal details */
+                                <Card className="shadow-sm bg-muted hover:cursor-not-allowed">
+                                    <CardHeader className="border-b">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                                <User className="w-5 h-5 text-primary" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base">Personal Details</CardTitle>
+                                                <CardDescription className="text-xs mt-0.5">
+                                                    Identification and contact information.
+                                                </CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-6 space-y-5">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <FormField
+                                                control={form.control}
+                                                name="fullName"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Full Name *</FormLabel>
                                                         <FormControl>
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Select affiliate type" />
-                                                            </SelectTrigger>
+                                                            <Input placeholder="e.g. Ram Bahadur" {...field} disabled />
                                                         </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="influencer">Influencer</SelectItem>
-                                                            <SelectItem value="reseller">Reseller</SelectItem>
-                                                            <SelectItem value="referral">Referral</SelectItem>
-                                                            <SelectItem value="partner">Partner</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="email"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Email Address *</FormLabel>
+                                                        <FormControl>
+                                                            <Input type="email" placeholder="ram@example.com.np" {...field} disabled />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <FormField
+                                                control={form.control}
+                                                name="affiliateType"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Affiliate Type</FormLabel>
+                                                        <Select value={field.value} onValueChange={field.onChange} disabled>
+                                                            <FormControl>
+                                                                <SelectTrigger className="w-full">
+                                                                    <SelectValue className='placeholder:text-gray-400' placeholder="Select affiliate type" />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                <SelectItem value="influencer">Influencer</SelectItem>
+                                                                <SelectItem value="reseller">Reseller</SelectItem>
+                                                                <SelectItem value="referral">Referral</SelectItem>
+                                                                <SelectItem value="partner">Partner</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="contactNumber"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Contact Number</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="+977 9800000000" {...field} disabled />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
                                         <FormField
                                             control={form.control}
-                                            name="contactNumber"
+                                            name="streetAddress"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>Contact Number</FormLabel>
+                                                    <FormLabel>Street Address</FormLabel>
                                                     <FormControl>
-                                                        <Input placeholder="+977 9800000000" {...field} disabled={isEdit} />
+                                                        <Textarea rows={2} className="resize-none" {...field} disabled />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
                                         />
-                                    </div>
-
-                                    <FormField
-                                        control={form.control}
-                                        name="physicalAddress"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Physical Address</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        rows={3}
-                                                        placeholder="Tinkune, Kathmandu, Nepal"
-                                                        className="resize-none"
-                                                        {...field}
-                                                        disabled={isEdit}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </CardContent>
-                            </Card>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <FormField control={form.control} name="city" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>City</FormLabel>
+                                                    <FormControl><Input {...field} disabled /></FormControl>
+                                                </FormItem>
+                                            )} />
+                                            <FormField control={form.control} name="state" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>State / Province</FormLabel>
+                                                    <FormControl><Input {...field} disabled /></FormControl>
+                                                </FormItem>
+                                            )} />
+                                            <FormField control={form.control} name="postalCode" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Postal Code</FormLabel>
+                                                    <FormControl><Input {...field} disabled /></FormControl>
+                                                </FormItem>
+                                            )} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                /* Create mode: show VendorSelector with tab-based new/existing */
+                                <VendorSelector form={form} />
+                            )}
 
                             {/* Affiliate Details Section */}
                             <Card className="shadow-sm">
@@ -471,7 +540,7 @@ export default function NewAffiliatePage() {
                                                     value={productSearch}
                                                     onChange={(e) => setProductSearch(e.target.value)}
                                                     placeholder="Search for products to link..."
-                                                    className="flex-1 text-sm bg-transparent border-0 shadow-none px-0 focus-visible:ring-0"
+                                                    className="flex-1 text-sm bg-transparent border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
                                                 />
                                                 {isSearchingProducts && (
                                                     <Spinner className="w-4 h-4 text-muted-foreground" />
@@ -542,7 +611,7 @@ export default function NewAffiliatePage() {
                                                         <Input
                                                             {...field}
                                                             placeholder="KTM-PARTNER-2026"
-                                                            className="flex-1 font-mono uppercase"
+                                                            className="flex-1 placeholder:text-gray-400 font-mono uppercase"
                                                             onChange={(e) =>
                                                                 field.onChange(e.target.value.toUpperCase())
                                                             }
@@ -571,7 +640,6 @@ export default function NewAffiliatePage() {
                                     {/* Discount & Commission Configuration */}
                                     <div className="rounded-xl border bg-muted/20 p-5 space-y-6">
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative">
-                                            {/* Divider for desktop */}
                                             <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 w-px bg-border -translate-x-1/2" />
 
                                             {/* Discount Configuration */}
@@ -605,14 +673,15 @@ export default function NewAffiliatePage() {
                                                             <FormLabel className="sr-only">Discount Value</FormLabel>
                                                             <FormControl>
                                                                 <div className="relative flex items-center">
-                                                                    <div className="absolute left-3 text-muted-foreground font-medium">
+                                                                    <div className="absolute text-xs left-3 text-muted-foreground font-medium">
                                                                         {discountType === 'fixed' ? 'Rs ' : '%'}
                                                                     </div>
                                                                     <Input
                                                                         {...field}
                                                                         type="number"
                                                                         min="0"
-                                                                        step="0.01"
+                                                                        step="1"
+                                                                        placeholder='5'
                                                                         className="pl-8 h-11 text-lg font-medium"
                                                                         onChange={(e) =>
                                                                             field.onChange(
@@ -659,14 +728,15 @@ export default function NewAffiliatePage() {
                                                             <FormLabel className="sr-only">Commission Value</FormLabel>
                                                             <FormControl>
                                                                 <div className="relative flex items-center">
-                                                                    <div className="absolute left-3 text-emerald-600 font-medium">
+                                                                    <div className="absolute text-xs left-3 text-emerald-600 font-medium">
                                                                         {commissionType === 'fixed' ? 'Rs' : '%'}
                                                                     </div>
                                                                     <Input
                                                                         {...field}
                                                                         type="number"
                                                                         min="0"
-                                                                        step="0.01"
+                                                                        step="1"
+                                                                        placeholder='5'
                                                                         className="pl-8 h-11 text-lg font-medium border-emerald-200 focus-visible:ring-emerald-500"
                                                                         onChange={(e) =>
                                                                             field.onChange(
@@ -687,7 +757,9 @@ export default function NewAffiliatePage() {
                             </Card>
 
                             {/* Bank Details Section */}
-                            <Card className="shadow-sm">
+                            {/* add bg-muted if in edit mode */}
+
+                            <Card className={`shadow-sm ${isEdit ? 'bg-muted hover:cursor-not-allowed' : ''}`}>
                                 <CardHeader className="border-b">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
@@ -710,7 +782,11 @@ export default function NewAffiliatePage() {
                                                 <FormItem>
                                                     <FormLabel>Bank Name</FormLabel>
                                                     <FormControl>
-                                                        <Input placeholder="e.g. Global IME Bank" {...field} disabled={isEdit} />
+                                                        <Input
+                                                            placeholder="e.g. Global IME Bank"
+                                                            {...field}
+                                                            disabled={isEdit}
+                                                        />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -725,8 +801,7 @@ export default function NewAffiliatePage() {
                                                     <FormLabel>Account Number</FormLabel>
                                                     <FormControl>
                                                         <Input
-                                                            placeholder="0010000000000"
-                                                            className="font-mono"
+                                                            placeholder="e.g. 0010000000000"
                                                             {...field}
                                                             disabled={isEdit}
                                                         />

@@ -56,7 +56,7 @@ interface AuthState {
   // Actions
   login: (email: string) => Promise<void>;
   verifyOtp: (otp: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setPendingEmail: (email: string | null) => void;
 }
 
@@ -96,8 +96,8 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      logout: () => {
-        setApiToken(null);
+      logout: async () => {
+        await setApiToken(null);
         set({
           currentUser: null,
           authToken: null,

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 
 interface OrderPricingBreakdownProps {
     subtotal: number
@@ -20,17 +20,13 @@ export function OrderPricingBreakdown({
     totalAmount,
     currency,
 }: OrderPricingBreakdownProps) {
-    const fmt = (amount: number) =>
-        new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
-
     const rows: { label: string; value: string; highlight?: boolean; discount?: boolean }[] = [
-        { label: 'Subtotal', value: fmt(subtotal) },
+        { label: 'Subtotal', value: formatCurrency(subtotal, currency) },
     ]
-
-    if (taxAmount > 0) rows.push({ label: 'Tax', value: fmt(taxAmount) })
-    if (shippingAmount > 0) rows.push({ label: 'Shipping', value: fmt(shippingAmount) })
     if (discountAmount > 0)
-        rows.push({ label: 'Discount', value: `-${fmt(discountAmount)}`, discount: true })
+        rows.push({ label: 'Discount', value: `-${formatCurrency(discountAmount, currency)}`, discount: true })
+    if (taxAmount > 0) rows.push({ label: 'Tax', value: formatCurrency(taxAmount, currency) })
+    if (shippingAmount > 0) rows.push({ label: 'Shipping', value: formatCurrency(shippingAmount, currency) })
 
     return (
         <Card className="py-4">
@@ -51,7 +47,7 @@ export function OrderPricingBreakdown({
                 <Separator />
                 <div className="flex justify-between text-sm font-bold">
                     <span>Total</span>
-                    <span>{fmt(totalAmount)}</span>
+                    <span>{formatCurrency(totalAmount, currency)}</span>
                 </div>
             </CardContent>
         </Card>

@@ -7,6 +7,8 @@ import {
     AFFILIATE_TYPE_COLORS,
 } from "./helpers";
 import { Badge } from "@/components/ui/badge";
+import { TruncatedText } from "../orders/TruncatedText";
+import { formatRelative } from "date-fns";
 
 interface AffiliateRowProps {
     affiliate: AffiliateListItem;
@@ -41,13 +43,19 @@ export function AffiliateRow({ affiliate, onEdit, onView }: AffiliateRowProps) {
                         <p className="text-sm font-semibold" style={{ color: "#0f172a" }}>
                             {affiliate.vendor.name}
                         </p>
-                        <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>
-                            {affiliate.vendor.email}
+                        <p>
+                            <TruncatedText
+                                text={affiliate.vendor.email}
+                                maxLength={15}
+                                className="text-xs mt-0.5 text-[9ca3af]"
+                            />
                         </p>
                         {affiliate.product && (
-                            <p className="text-xs mt-0.5 font-medium" style={{ color: "#6366f1" }}>
-                                {affiliate.product.title}
-                            </p>
+                            <TruncatedText
+                                text={affiliate.product.title}
+                                maxLength={15}
+                                className="text-xs mt-0.5 font-medium"
+                            />
                         )}
                     </div>
                 </div>
@@ -75,7 +83,7 @@ export function AffiliateRow({ affiliate, onEdit, onView }: AffiliateRowProps) {
                 <span className="text-sm tabular-nums" style={{ color: "#374151" }}>
                     {affiliate.discountType === "PERCENTAGE"
                         ? `${affiliate.discountValue}%`
-                        : `$${affiliate.discountValue}`}
+                        : `NPR ${affiliate.discountValue}`}
                 </span>
             </td>
 
@@ -87,7 +95,7 @@ export function AffiliateRow({ affiliate, onEdit, onView }: AffiliateRowProps) {
                 >
                     {affiliate.commissionType === "PERCENTAGE"
                         ? `${affiliate.commissionValue}%`
-                        : `$${affiliate.commissionValue}`}
+                        : `NPR ${affiliate.commissionValue}`}
                 </span>
             </td>
 
@@ -112,11 +120,15 @@ export function AffiliateRow({ affiliate, onEdit, onView }: AffiliateRowProps) {
             {/* Joined date */}
             <td className="py-5 px-6">
                 <span className="text-sm" style={{ color: "#6b7280" }}>
-                    {new Date(affiliate.createdAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                    })}
+
+                    <TruncatedText
+                        text={
+                            formatRelative(new Date(affiliate.createdAt), new Date())
+                        }
+                        maxLength={12}
+                        className="text-xs mt-0.5 font-medium"
+                    />
+                    {/* {formatRelative(new Date(affiliate.createdAt), new Date())} */}
                 </span>
             </td>
 

@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, User } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -41,22 +41,39 @@ export function OrderVerificationCard({ verification }: OrderVerificationCardPro
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Response</span>
                         <span className="text-sm font-medium capitalize">
-                            {verification.customerResponse}
+                            {verification.customerResponse.replace(/_/g, ' ')}
+                        </span>
+                    </div>
+                )}
+                {verification.admin && (
+                    <>
+                        <div className="border-t pt-2.5" />
+                        <div>
+                            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1.5">Verified By</p>
+                            <div className="flex items-start gap-2">
+                                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                    <User className="w-3.5 h-3.5 text-primary" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold truncate">{verification.admin.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{verification.admin.email}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+                {verification.verifiedAt && (
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Verified At</span>
+                        <span className="text-sm font-medium">
+                            {formatRelative(new Date(verification.verifiedAt), new Date())}
                         </span>
                     </div>
                 )}
                 {verification.remarks && (
-                    <div>
-                        <span className="text-sm text-muted-foreground">Remarks</span>
-                        <p className="text-sm mt-0.5">{verification.remarks}</p>
-                    </div>
-                )}
-                {verification.verifiedAt && (
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Verified</span>
-                        <span className="text-sm">
-                            {formatRelative(new Date(verification.verifiedAt), new Date())}
-                        </span>
+                    <div className="pt-1">
+                        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Remarks</p>
+                        <p className="text-sm leading-relaxed">{verification.remarks}</p>
                     </div>
                 )}
             </CardContent>

@@ -15,13 +15,38 @@ export const apiClient = axios.create({
   },
 });
 
-export function setApiToken(token: string | null) {
+export function setApiToken(token: string | null): Promise<void> {
   if (token) {
     apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
-    return;
+  } else {
+    delete apiClient.defaults.headers.common.Authorization;
   }
 
-  delete apiClient.defaults.headers.common.Authorization;
+  // Sync token to an httpOnly cookie via the session API route
+  // so the Next.js proxy can read it server-side
+  if (typeof window !== "undefined") {
+    return syncSessionCookie(token);
+  }
+
+  return Promise.resolve();
+}
+
+async function syncSessionCookie(token: string | null): Promise<void> {
+  const url = "/api/auth/session";
+
+  try {
+    if (token) {
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+    } else {
+      await fetch(url, { method: "DELETE" });
+    }
+  } catch {
+    // Non-critical: proxy redirect won't work but app still functions
+  }
 }
 
 apiClient.interceptors.request.use((config) => {

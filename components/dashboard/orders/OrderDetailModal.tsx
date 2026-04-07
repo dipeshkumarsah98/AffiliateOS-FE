@@ -142,24 +142,24 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
                                     <span className="text-muted-foreground">Subtotal</span>
                                     <span>{formatCurrency(detail?.subtotal ?? order.subtotal, currency)}</span>
                                 </div>
-                                {(detail?.taxAmount ?? order.taxAmount) > 0 && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Tax</span>
-                                        <span>{formatCurrency(detail?.taxAmount ?? order.taxAmount, currency)}</span>
-                                    </div>
-                                )}
-                                {(detail?.shippingAmount ?? order.shippingAmount) > 0 && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Shipping</span>
-                                        <span>{formatCurrency(detail?.shippingAmount ?? order.shippingAmount, currency)}</span>
-                                    </div>
-                                )}
                                 {(detail?.discountAmount ?? order.discountAmount) > 0 && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">Discount</span>
                                         <span className="text-green-600">
                                             -{formatCurrency(detail?.discountAmount ?? order.discountAmount, currency)}
                                         </span>
+                                    </div>
+                                )}
+                                {(detail?.taxAmount ?? order.taxAmount) > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Tax</span>
+                                        <span>{formatCurrency(detail?.taxAmount ?? order.taxAmount, currency)} (13%)</span>
+                                    </div>
+                                )}
+                                {(detail?.shippingAmount ?? order.shippingAmount) > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Shipping</span>
+                                        <span>{formatCurrency(detail?.shippingAmount ?? order.shippingAmount, currency)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-sm font-bold pt-1">
@@ -177,7 +177,7 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
                                     Shipping Address
                                 </p>
                                 {detail?.shippingAddress ? (
-                                    <div className="space-y-1.5 text-sm">
+                                    <div className="space-y-3 text-sm rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-4">
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Street</span>
                                             <span className="font-medium text-right">{detail.shippingAddress.street_address}</span>
@@ -207,33 +207,57 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
                                 )}
                             </div>
 
-                            {/* Affiliate */}
                             {detail?.affiliate ? (
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-wider mb-2 text-muted-foreground">
-                                        Affiliate
+                                        Affiliate Partner
                                     </p>
-                                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                                        <div className="flex items-center gap-1.5 mb-0.5">
-                                            <Link2 className="w-3.5 h-3.5 text-primary" />
-                                            <span className="text-sm font-semibold text-primary">{detail.affiliate.fullName}</span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Code: {detail.affiliate.affiliateCode}
-                                        </p>
-                                        {detail.earnings.length > 0 && (
-                                            <p className="text-xs font-medium text-emerald-600 mt-1">
-                                                Earned: {formatCurrency(detail.earnings.reduce((s, e) => s + e.amount, 0), currency)}
+                                    <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 space-y-3">
+                                        {/* Vendor Info */}
+                                        <div>
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <User className="w-3.5 h-3.5 text-primary" />
+                                                <span className="text-sm font-semibold text-primary">{detail.affiliate.vendor.name}</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground ml-5">
+                                                {detail.affiliate.vendor.email}
                                             </p>
-                                        )}
+                                        </div>
+
+                                        {/* Divider */}
+                                        <div className="border-t border-primary/10" />
+
+                                        {/* Affiliate Code */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5">
+                                                <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                                <span className="text-xs text-muted-foreground">Code:</span>
+                                            </div>
+                                            <span className="text-xs font-mono font-semibold bg-background/60 px-2 py-0.5 rounded">
+                                                {detail.affiliate.code}
+                                            </span>
+                                        </div>
+
+                                        {/* Discount Info */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Discount:</span>
+                                            <span className="text-xs font-semibold text-primary">
+                                                {detail.affiliate.discountType === 'PERCENTAGE'
+                                                    ? `${detail.affiliate.discountValue}%`
+                                                    : formatCurrency(detail.affiliate.discountValue, currency)
+                                                } OFF
+                                            </span>
+                                        </div>
+
+
                                     </div>
                                 </div>
                             ) : order.affiliateId && isLoading ? (
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-wider mb-2 text-muted-foreground">
-                                        Affiliate
+                                        Affiliate Partner
                                     </p>
-                                    <Skeleton className="h-16 w-full rounded-lg" />
+                                    <Skeleton className="h-32 w-full rounded-lg" />
                                 </div>
                             ) : null}
                         </div>

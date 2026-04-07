@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
-import { ArrowLeft, RefreshCw, AlertCircle, Link2 } from 'lucide-react'
+import { ArrowLeft, RefreshCw, AlertCircle, Link2, User } from 'lucide-react'
 
 import { Topbar } from '@/components/layout/Topbar'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import { UpdateStatusDialog } from '@/components/dashboard/orders/UpdateStatusDi
 import { useOrderDetailQuery } from '@/hooks/use-orders'
 import { useAuthStore } from '@/stores/auth-store'
 import { formatRelative } from 'date-fns'
+import { formatCurrency } from '@/lib/utils'
 
 const TERMINAL_STATUSES = ['COMPLETED', 'CANCELLED']
 
@@ -135,6 +136,7 @@ export default function OrderDetailPage() {
                                     <OrderCustomerCard
                                         name={order.user.name}
                                         email={order.user.email}
+                                        shippingAddress={order?.shippingAddress}
                                     />
                                     <OrderPaymentCard
                                         payment={order.payment}
@@ -193,20 +195,61 @@ export default function OrderDetailPage() {
                                 )}
 
                                 {order.affiliate && (
-                                    <Card className="py-4">
+                                    <Card className="py-4 bg-linear-to-br from-primary/5 to-primary/10 border-primary/20">
                                         <CardHeader className="pb-0">
-                                            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                                <Link2 className="w-3.5 h-3.5" />
-                                                Affiliate
+                                            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                Affiliate Partner
                                             </CardTitle>
                                         </CardHeader>
-                                        <CardContent className="space-y-1.5">
-                                            <p className="text-sm font-medium">
-                                                {order.affiliate.fullName}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground font-mono">
-                                                {order.affiliate.affiliateCode}
-                                            </p>
+                                        <CardContent className="space-y-3">
+                                            {/* Vendor Info */}
+                                            <div>
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <User className="w-3.5 h-3.5 text-primary" />
+                                                    <span className="text-sm font-semibold text-primary">{order.affiliate.vendor.name}</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground ml-5">
+                                                    {order.affiliate.vendor.email}
+                                                </p>
+                                            </div>
+
+                                            {/* Divider */}
+                                            <div className="border-t border-primary/10" />
+
+                                            {/* Affiliate Code */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                                    <span className="text-xs text-muted-foreground">Code:</span>
+                                                </div>
+                                                <span className="text-xs font-mono font-semibold bg-background/60 px-2 py-0.5 rounded">
+                                                    {order.affiliate.code}
+                                                </span>
+                                            </div>
+
+                                            {/* Discount Info */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-muted-foreground">Discount:</span>
+                                                <span className="text-xs font-semibold text-primary">
+                                                    {order.affiliate.discountType === 'PERCENTAGE'
+                                                        ? `${order.affiliate.discountValue}%`
+                                                        : formatCurrency(order.affiliate.discountValue, order.currency)
+                                                    } OFF
+                                                </span>
+                                            </div>
+
+                                            {/* Earnings */}
+                                            {order.earnings && order.earnings.length > 0 && (
+                                                <>
+                                                    <div className="border-t border-primary/10" />
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-muted-foreground">Commission Earned:</span>
+                                                        <span className="text-xs font-bold text-emerald-600">
+                                                            {formatCurrency(order.earnings.reduce((s, e) => s + e.amount, 0), order.currency)}
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 )}

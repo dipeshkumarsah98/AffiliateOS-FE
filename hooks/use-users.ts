@@ -14,3 +14,25 @@ export function useSearchUsers(search: string, page = 1, perPage = 10) {
     placeholderData: (previousData) => previousData,
   });
 }
+
+export function useSearchVendors(search: string, page = 1, perPage = 10) {
+  return useQuery({
+    queryKey: queryKeys.users.list({
+      search,
+      page,
+      perPage,
+      context: "vendors",
+    }),
+    queryFn: () =>
+      searchUsers({
+        search,
+        page,
+        perPage,
+        role: ["admin", "vendor"],
+        extras: true,
+        sortBy: "roles",
+        sortOrder: "asc",
+      }),
+    placeholderData: (previousData) => previousData,
+  });
+}

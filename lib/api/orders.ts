@@ -4,6 +4,17 @@ import type { OrderFormData } from "../order-form-store";
 
 // ── Order Detail types ──────────────────────────────────────────────────────
 
+export interface Address {
+  id: string;
+  userId: string;
+  addressType: "shipping" | "billing";
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  isDefault: boolean;
+  createdAt: string;
+}
 export interface OrderDetailProduct {
   id: string;
   slug: string;
@@ -27,17 +38,7 @@ export interface OrderDetailItem {
   product: OrderDetailProduct;
 }
 
-export interface OrderAddress {
-  id: string;
-  userId: string;
-  addressType: "shipping" | "billing";
-  street_address: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  isDefault: boolean;
-  createdAt: string;
-}
+export interface OrderAddress extends Address {}
 
 export interface OrderPayment {
   id: string;
@@ -52,6 +53,15 @@ export interface OrderPayment {
   createdAt: string;
 }
 
+export interface OrderAffiliate {
+  code: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  vendor: {
+    name: string;
+    email: string;
+  };
+}
 export interface OrderVerification {
   id: string;
   orderId: string;
@@ -61,6 +71,11 @@ export interface OrderVerification {
   remarks: string | null;
   verifiedAt: string | null;
   createdAt: string;
+  admin: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 }
 
 export interface OrderStatusEntry {
@@ -100,7 +115,7 @@ export interface OrderDetailResponse {
     status: string;
     createdAt: string;
   }[];
-  affiliate: { id: string; fullName: string; affiliateCode: string } | null;
+  affiliate: OrderAffiliate | null;
   shippingAddress: OrderAddress | null;
   billingAddress: OrderAddress | null;
   statuses?: OrderStatusEntry[];
@@ -199,6 +214,7 @@ export interface ValidateAffiliateCodeResponse {
   };
   vendor: {
     id: string;
+    name: string;
     email: string;
   };
 }

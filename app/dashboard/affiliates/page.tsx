@@ -245,7 +245,7 @@ export default function AffiliatesPage() {
                 pageSize={PAGE_SIZE}
                 onRetry={handleRefetch}
                 onView={setViewAffiliate}
-                onEdit={(affiliate) => router.push(`/dashboard/affiliates/${affiliate.id}`)}
+                onEdit={(affiliate) => router.push(`/dashboard/affiliates/${affiliate.id}/edit`)}
               />
             </TableBody>
           </Table>

@@ -12,6 +12,14 @@ export interface UserAddress {
   isDefault: boolean;
 }
 
+// ── User Extras types ───────────────────────────────────────────────────────
+
+export interface UserExtras {
+  bankName?: string;
+  accountNumber?: string;
+  affiliateType?: string;
+}
+
 // ── User Search types ───────────────────────────────────────────────────────
 
 export interface UserSearchItem {
@@ -21,6 +29,7 @@ export interface UserSearchItem {
   phone: string;
   roles: string[];
   createdAt: string;
+  extras?: UserExtras;
   addresses: UserAddress[];
 }
 
@@ -28,6 +37,10 @@ export interface SearchUsersParams {
   search: string;
   page?: number;
   perPage?: number;
+  role?: string[];
+  extras?: boolean;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }
 
 export interface SearchUsersResponse {
@@ -45,6 +58,19 @@ export async function searchUsers(
 ): Promise<SearchUsersResponse> {
   const { data } = await apiClient.get<SearchUsersResponse>("/users", {
     params,
+    paramsSerializer: (params) => {
+      const searchParams = new URLSearchParams();
+      Object.entries(params as Record<string, unknown>).forEach(
+        ([key, value]) => {
+          if (Array.isArray(value)) {
+            value.forEach((v) => searchParams.append(key, String(v)));
+          } else if (value !== undefined && value !== null) {
+            searchParams.append(key, String(value));
+          }
+        },
+      );
+      return searchParams.toString();
+    },
   });
   return data;
 }

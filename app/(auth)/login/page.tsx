@@ -5,13 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useSendOtpMutation } from '@/hooks/use-auth'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { Layers, ArrowRight, CheckCircle2, Zap, Shield } from 'lucide-react'
-
-const DEMO_ACCOUNTS = [
-  { email: 'admin@affiliateos.com', label: 'Admin', color: 'var(--primary-fixed)', textColor: 'var(--on-primary-fixed)' },
-  { email: 'jordan@partner.com', label: 'Vendor (Jordan)', color: 'var(--secondary-container)', textColor: 'var(--on-secondary-container)' },
-  { email: 'priya@reseller.io', label: 'Vendor (Priya)', color: 'var(--tertiary-container)', textColor: 'var(--on-tertiary-container)' },
-]
-
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -29,10 +22,6 @@ export default function LoginPage() {
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to send OTP. Please check your email and try again.'))
     }
-  }
-
-  function quickLogin(demoEmail: string) {
-    setEmail(demoEmail)
   }
 
   return (
@@ -164,34 +153,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Demo accounts */}
-          <div className="mt-8">
-            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--on-surface-variant)' }}>
-              Demo Accounts
-            </p>
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((acct) => (
-                <button
-                  key={acct.email}
-                  onClick={() => quickLogin(acct.email)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:opacity-80 cursor-pointer"
-                  style={{ background: 'var(--surface-container-low)' }}
-                >
-                  <span
-                    className="px-2 py-0.5 rounded-full text-xs font-semibold shrink-0"
-                    style={{ background: acct.color, color: acct.textColor }}
-                  >
-                    {acct.label}
-                  </span>
-                  <span className="text-xs truncate" style={{ color: 'var(--on-surface-variant)' }}>{acct.email}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs mt-3" style={{ color: 'var(--on-surface-variant)' }}>
-              Use any 6-digit code as OTP on the next step.
-            </p>
-          </div>
         </div>
       </div>
     </div>

@@ -22,6 +22,7 @@ export default function OtpPage() {
   const hasRedirected = useRef(false)
   useEffect(() => {
     if (hasHydrated && !pendingEmail && !hasRedirected.current) {
+      hasRedirected.current = true
       router.replace('/login')
     }
   }, [pendingEmail, hasHydrated, router])

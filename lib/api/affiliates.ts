@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { Address } from "./orders";
 
 // Enums matching backend expectations (UPPERCASED)
 export type AffiliateTypeAPI =
@@ -10,37 +11,51 @@ export type AffiliateTypeAPI =
 export type DiscountTypeAPI = "PERCENTAGE" | "FIXED";
 export type CommissionTypeAPI = "PERCENTAGE" | "FIXED";
 
-// POST /affiliates payload
-export interface CreateAffiliatePayload {
+// Shared affiliate payload shape
+export interface AffiliatePayload {
+  productId: string;
+  code: string;
+  discountType: DiscountTypeAPI;
+  discountValue: number;
+  commissionType: CommissionTypeAPI;
+  commissionValue: number;
+}
+
+// Structured vendor address
+export interface VendorAddress {
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+}
+
+// POST /affiliates payload — new vendor
+export interface CreateAffiliateWithNewVendor {
   vendor: {
     name: string;
     email: string;
     affiliateType: AffiliateTypeAPI;
     contact: string;
-    address: string;
+    address: VendorAddress;
     bankName: string;
     accountNumber: string;
   };
-  affiliate: {
-    productId: string;
-    code: string;
-    discountType: DiscountTypeAPI;
-    discountValue: number;
-    commissionType: CommissionTypeAPI;
-    commissionValue: number;
-  };
+  affiliate: AffiliatePayload;
 }
+
+// POST /affiliates payload — existing vendor
+export interface CreateAffiliateWithExistingVendor {
+  vendorId: string;
+  affiliate: AffiliatePayload;
+}
+
+export type CreateAffiliatePayload =
+  | CreateAffiliateWithNewVendor
+  | CreateAffiliateWithExistingVendor;
 
 // PATCH /affiliates/:id payload
 export interface UpdateAffiliatePayload {
-  affiliate: {
-    productId: string;
-    code: string;
-    discountType: DiscountTypeAPI;
-    discountValue: number;
-    commissionType: CommissionTypeAPI;
-    commissionValue: number;
-  };
+  affiliate: AffiliatePayload;
 }
 
 // GET /affiliates/:id response
@@ -86,7 +101,9 @@ export interface AffiliateVendorSummary {
   id: string;
   name: string;
   email: string;
+  phone: string;
   extras: AffiliateVendorExtras;
+  addresses: Address[];
 }
 
 // Single item in GET /affiliates response

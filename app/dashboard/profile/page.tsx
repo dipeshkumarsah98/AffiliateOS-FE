@@ -10,8 +10,8 @@ export default function ProfilePage() {
   const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
 
-  function handleLogout() {
-    logout()
+  async function handleLogout() {
+    await logout()
     router.replace('/login')
   }
 
@@ -119,7 +119,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Sign out */}
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl text-sm font-semibold transition-all hover:opacity-90"

@@ -38,7 +38,11 @@ const STATUS_TRANSITIONS: Record<string, { value: string; label: string }[]> = {
         { value: 'SHIPPED', label: 'Shipped' },
         { value: 'CANCELLED', label: 'Cancel Order' },
     ],
-    SHIPPED: [{ value: 'COMPLETED', label: 'Delivered' }],
+    SHIPPED: [{
+        value: 'COMPLETED', label: 'Delivered'
+    },
+    { value: 'CANCELLED', label: 'Cancel Order' }
+    ],
 }
 
 interface UpdateStatusDialogProps {
@@ -100,23 +104,27 @@ export function UpdateStatusDialog({
                     </Select>
                 </div>
 
-                <DialogFooter className="gap-2 sm:gap-0">
-                    <Button
-                        variant="outline"
-                        onClick={() => {
-                            setSelected('')
-                            onOpenChange(false)
-                        }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        variant={isCancelAction ? 'destructive' : 'default'}
-                        disabled={!selected || mutation.isPending}
-                        onClick={handleConfirm}
-                    >
-                        {mutation.isPending ? 'Updating...' : 'Confirm'}
-                    </Button>
+                <DialogFooter className="gap-3 sm:gap-0">
+                    <div className="gap-3">
+
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSelected('')
+                                onOpenChange(false)
+                            }}
+                            className='mr-2'
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant={isCancelAction ? 'destructive' : 'default'}
+                            disabled={!selected || mutation.isPending}
+                            onClick={handleConfirm}
+                        >
+                            {mutation.isPending ? 'Updating...' : 'Confirm'}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

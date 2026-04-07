@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, XCircle, X, Package, Phone, User, CreditCard, Loader2 } from 'lucide-react'
+import { Check, XCircle, X, Package, Phone, User, CreditCard, Loader2, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -76,20 +76,20 @@ export function CodVerificationModal({ order, onClose }: CodVerificationModalPro
                     </div>
 
                     <div className="p-7 overflow-y-auto flex-1">
-                        {/* Customer Row */}
-                        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                        {/* Customer + Affiliate Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             {/* Customer */}
-                            <div className="flex-1 flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border/50">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                    <User className="w-4 h-4 text-primary" />
+                            <div className={`flex items-start gap-3 p-4 rounded-lg bg-linear-to-br from-blue-500/5 to-blue-600/10 border border-blue-500/20 ${!orderDetail?.affiliate && isLoadingDetail ? '' : !orderDetail?.affiliate ? 'md:col-span-2' : ''}`}>
+                                <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                                    <User className="w-4 h-4 text-blue-600" />
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-bold">Customer</p>
                                     <p className="text-sm font-semibold truncate">{order.user.name}</p>
                                     <p className="text-xs text-muted-foreground truncate">{order.user.email}</p>
                                     <a
                                         href={`tel:${order.user.phone}`}
-                                        className="text-xs font-semibold hover:underline inline-flex items-center gap-1 text-primary mt-1.5"
+                                        className="text-xs font-semibold hover:underline inline-flex items-center gap-1 text-blue-600 mt-1.5"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         <Phone className="w-3 h-3" />
@@ -97,6 +97,65 @@ export function CodVerificationModal({ order, onClose }: CodVerificationModalPro
                                     </a>
                                 </div>
                             </div>
+
+                            {/* Affiliate Partner */}
+                            {orderDetail?.affiliate ? (
+                                <div className="p-4 rounded-lg bg-linear-to-br from-primary/5 to-primary/10 border border-primary/20">
+                                    <p className="text-[10px] text-muted-foreground mb-3 uppercase tracking-wider font-bold">Affiliate Partner</p>
+                                    <div className="space-y-3">
+                                        {/* Vendor Info */}
+                                        <div>
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <User className="w-3.5 h-3.5 text-primary" />
+                                                <span className="text-sm font-semibold text-primary truncate">{orderDetail.affiliate.vendor.name}</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground ml-5 truncate">
+                                                {orderDetail.affiliate.vendor.email}
+                                            </p>
+                                        </div>
+
+                                        {/* Divider */}
+                                        <div className="border-t border-primary/10" />
+
+                                        {/* Affiliate Code */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5">
+                                                <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                                <span className="text-xs text-muted-foreground">Code:</span>
+                                            </div>
+                                            <span className="text-xs font-mono font-semibold bg-background/60 px-2 py-0.5 rounded">
+                                                {orderDetail.affiliate.code}
+                                            </span>
+                                        </div>
+
+                                        {/* Discount Info */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">Discount:</span>
+                                            <span className="text-xs font-semibold text-primary">
+                                                {orderDetail.affiliate.discountType === 'PERCENTAGE'
+                                                    ? `${orderDetail.affiliate.discountValue}%`
+                                                    : formatCurrency(orderDetail.affiliate.discountValue, currency)
+                                                } OFF
+                                            </span>
+                                        </div>
+
+                                        {/* Earnings */}
+                                        {orderDetail.earnings && orderDetail.earnings.length > 0 && (
+                                            <>
+                                                <div className="border-t border-primary/10" />
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-muted-foreground">Commission:</span>
+                                                    <span className="text-xs font-bold text-emerald-600">
+                                                        {formatCurrency(orderDetail.earnings.reduce((s, e) => s + e.amount, 0), currency)}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : isLoadingDetail && order.affiliateId ? (
+                                <Skeleton className="h-full w-full rounded-lg" />
+                            ) : null}
                         </div>
 
                         {/* Items Summary */}
@@ -146,13 +205,25 @@ export function CodVerificationModal({ order, onClose }: CodVerificationModalPro
                             <div className="mt-4 pt-4 space-y-1.5 border-t border-border/50">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Subtotal</span>
-                                    <span>{formatCurrency(order.totalAmount, currency)}</span>
+                                    <span>{formatCurrency(orderDetail?.subtotal ?? order.subtotal, currency)}</span>
                                 </div>
-                                {order.affiliateId && orderDetail?.earnings && orderDetail.earnings.length > 0 && (
+                                {(orderDetail?.taxAmount ?? order.taxAmount ?? 0) > 0 && (
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Affiliate Commission</span>
-                                        <span className="font-semibold text-emerald-600">
-                                            {formatCurrency(orderDetail.earnings[0].amount, currency)}
+                                        <span className="text-muted-foreground">Tax</span>
+                                        <span>{formatCurrency(orderDetail?.taxAmount ?? order.taxAmount, currency)}</span>
+                                    </div>
+                                )}
+                                {(orderDetail?.shippingAmount ?? order.shippingAmount ?? 0) > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Shipping</span>
+                                        <span>{formatCurrency(orderDetail?.shippingAmount ?? order.shippingAmount, currency)}</span>
+                                    </div>
+                                )}
+                                {(orderDetail?.discountAmount ?? order.discountAmount ?? 0) > 0 && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Discount</span>
+                                        <span className="text-green-600">
+                                            -{formatCurrency(orderDetail?.discountAmount ?? order.discountAmount, currency)}
                                         </span>
                                     </div>
                                 )}
