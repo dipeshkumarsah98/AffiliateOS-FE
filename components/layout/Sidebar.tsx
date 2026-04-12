@@ -32,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Affiliates', href: '/dashboard/affiliates', icon: Users, roles: ['admin'] },
   { label: 'Admin', href: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] },
   { label: 'Withdrawals', href: '/dashboard/withdrawals', icon: Banknote, roles: ['admin'] },
-  { label: 'My Orders', href: '/dashboard/my-orders', icon: ClipboardList, roles: ['vendor'] },
   { label: 'Earnings', href: '/dashboard/earnings', icon: DollarSign, roles: ['vendor'] },
   { label: 'Withdrawals', href: '/dashboard/my-withdrawals', icon: Banknote, roles: ['vendor'] },
 ]

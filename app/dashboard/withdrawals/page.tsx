@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Banknote, Search, ChevronDown, Eye, Check, X, XCircle, ImageIcon, RefreshCw, Clock } from 'lucide-react'
-import { DUMMY_WITHDRAWALS, DUMMY_AFFILIATES } from '@/lib/dummy-data'
-import type { Withdrawal, Affiliate } from '@/lib/types'
+import { Banknote, Search, ChevronDown, Eye, Check, XCircle, ImageIcon, RefreshCw, Clock } from 'lucide-react'
 import { Topbar } from '@/components/layout/Topbar'
 import { ReviewModal } from '@/components/dashboard/withdrawals/ReviewModal'
 import { Button } from '@/components/ui/button'
@@ -12,21 +10,22 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useDebounce } from '@/hooks/use-debounce'
-import { cn } from '@/lib/utils'
 import { formatRelative } from 'date-fns'
+import { useAdminWithdrawalStatsQuery, useAdminWithdrawalsQuery } from '@/hooks/use-admin-withdrawals'
+import { useAuthStore } from '@/stores/auth-store'
+import StatCardSkeleton from '@/components/common/StatCardSkeleton'
+import { TableSkeletonRow } from '@/components/dashboard/TableSkeletonRow'
+import { WithdrawalsPagination } from '@/components/dashboard/withdrawals/WithdrawalsPagination'
+import type { AdminWithdrawalListItem } from '@/lib/api/admin-withdrawals'
+import { toast } from 'sonner'
 
-type WithdrawalWithAffiliate = Withdrawal & { affiliate: Affiliate | undefined }
+const PAGE_SIZE = 20
 
-const INITIAL: WithdrawalWithAffiliate[] = DUMMY_WITHDRAWALS.map((w) => ({
-  ...w,
-  affiliate: DUMMY_AFFILIATES.find((a) => a.id === w.affiliateId),
-}))
-
-function StatusPill({ status }: { status: Withdrawal['status'] }) {
+function StatusPill({ status }: { status: 'PENDING' | 'APPROVED' | 'REJECTED' }) {
   const map = {
-    pending: { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b', label: 'Pending' },
-    approved: { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Approved' },
-    rejected: { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Rejected' },
+    PENDING: { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b', label: 'Pending' },
+    APPROVED: { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Approved' },
+    REJECTED: { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Rejected' },
   }
   const s = map[status]
   return (
@@ -43,20 +42,46 @@ function StatusPill({ status }: { status: Withdrawal['status'] }) {
 export default function WithdrawalsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const currentUser = useAuthStore((state) => state.currentUser)
+
+  // Admin guard
+  useEffect(() => {
+    if (currentUser && !currentUser.roles.includes('admin')) {
+      toast.error('Access denied. Admin only.')
+      router.push('/dashboard')
+    }
+  }, [currentUser, router])
 
   // Initialize state from URL params
-  const [withdrawals, setWithdrawals] = useState<WithdrawalWithAffiliate[]>(INITIAL)
+  const [page, setPage] = useState(() => {
+    const pageParam = searchParams.get('page')
+    return pageParam ? parseInt(pageParam, 10) : 1
+  })
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const debouncedSearch = useDebounce(search, 500)
-  const [statusFilter, setStatusFilter] = useState<Withdrawal['status'] | 'all'>(
-    (searchParams.get('status') as Withdrawal['status']) || 'all'
-  )
-  const [selected, setSelected] = useState<WithdrawalWithAffiliate | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'all'>(() => {
+    const status = searchParams.get('status') as 'PENDING' | 'APPROVED' | 'REJECTED' | null
+    if (status === 'PENDING' || status === 'APPROVED' || status === 'REJECTED') {
+      return status
+    }
+    return 'all'
+  })
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // Update URL when filters change
+  // Fetch data from API
+  const statsQuery = useAdminWithdrawalStatsQuery()
+  const withdrawalsQuery = useAdminWithdrawalsQuery({
+    page,
+    limit: PAGE_SIZE,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    search: debouncedSearch || undefined,
+  })
+
+  // Update URL when filters or page change
   useEffect(() => {
     const params = new URLSearchParams()
 
+    if (page > 1) params.set('page', page.toString())
     if (search.trim()) params.set('search', search.trim())
     if (statusFilter !== 'all') params.set('status', statusFilter)
 
@@ -64,64 +89,39 @@ export default function WithdrawalsPage() {
       ? `/dashboard/withdrawals?${params.toString()}`
       : '/dashboard/withdrawals'
     router.replace(newUrl, { scroll: false })
-  }, [search, statusFilter, router])
+  }, [page, search, statusFilter, router])
 
-  const stats = {
-    total: withdrawals.length,
-    pending: withdrawals.filter((w) => w.status === 'pending').length,
-    approved: withdrawals.filter((w) => w.status === 'approved').length,
-    rejected: withdrawals.filter((w) => w.status === 'rejected').length,
-    totalAmount: withdrawals
-      .filter((w) => w.status === 'pending')
-      .reduce((s, w) => s + w.amount, 0),
-  }
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, statusFilter])
 
-  const filtered = withdrawals.filter((w) => {
-    const matchStatus = statusFilter === 'all' || w.status === statusFilter
-    const q = debouncedSearch.toLowerCase()
-    const matchSearch =
-      !q ||
-      w.id.toLowerCase().includes(q) ||
-      w.affiliate?.fullName.toLowerCase().includes(q) ||
-      w.affiliate?.email.toLowerCase().includes(q)
-    return matchStatus && matchSearch
-  })
+  const stats = statsQuery.data ?? { totalRequests: 0, pending: 0, approved: 0, rejected: 0 }
+  const withdrawals = withdrawalsQuery.data?.items ?? []
+  const total = withdrawalsQuery.data?.total ?? 0
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const isFiltering = search !== debouncedSearch
-
-  function handleUpdate(
-    id: string,
-    status: 'approved' | 'rejected',
-    remarks: string,
-    screenshot?: string
-  ) {
-    setWithdrawals((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-            ...w,
-            status,
-            remarks,
-            paymentScreenshot: screenshot,
-            processedAt: new Date().toISOString(),
-          }
-          : w
-      )
-    )
-  }
 
   function handleSearch(val: string) {
     setSearch(val)
   }
 
   function handleStatusFilter(status: string) {
-    setStatusFilter(status as typeof statusFilter)
+    const validStatuses = ['all', 'PENDING', 'APPROVED', 'REJECTED'] as const
+    if (validStatuses.includes(status as any)) {
+      setStatusFilter(status as typeof statusFilter)
+    }
+  }
+
+  function handlePageChange(newPage: number) {
+    setPage(newPage)
   }
 
   const STAT_CARDS = [
     {
       label: 'Total Requests',
-      value: stats.total,
+      value: stats.totalRequests,
       icon: (
         <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary/10">
           <Banknote className="w-5 h-5 text-primary" />
@@ -131,7 +131,6 @@ export default function WithdrawalsPage() {
     {
       label: 'Pending',
       value: stats.pending,
-      sub: `$${stats.totalAmount.toFixed(2)} outstanding`,
       icon: (
         <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10">
           <Clock className="w-5 h-5 text-amber-600" />
@@ -167,24 +166,26 @@ export default function WithdrawalsPage() {
       <div className="flex-1 p-4 md:p-8 max-w-screen-2xl mx-auto w-full">
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-5 md:mb-6">
-          {STAT_CARDS.map((stat) => (
-            <Card key={stat.label}>
-              <CardContent className="flex items-center gap-4 px-6 py-5">
-                {stat.icon}
-                <div className="flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider mb-0.5 text-muted-foreground">
-                    {stat.label}
-                  </p>
-                  <p className="text-2xl font-bold tracking-tight text-foreground">
-                    {stat.value}
-                  </p>
-                  {stat.sub && (
-                    <p className="text-xs mt-1 font-medium text-muted-foreground">{stat.sub}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {statsQuery.isLoading ? (
+            // Show 4 skeleton cards while loading
+            Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+          ) : (
+            STAT_CARDS.map((stat) => (
+              <Card key={stat.label}>
+                <CardContent className="flex items-center gap-4 px-6 py-5">
+                  {stat.icon}
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-0.5 text-muted-foreground">
+                      {stat.label}
+                    </p>
+                    <p className="text-2xl font-bold tracking-tight text-foreground">
+                      {stat.value}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
 
         {/* Search and filters */}
@@ -211,9 +212,9 @@ export default function WithdrawalsPage() {
               className="appearance-none pl-4 pr-9 py-2 rounded-xl text-sm font-medium outline-none transition-all border bg-background"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
           </div>
@@ -243,7 +244,12 @@ export default function WithdrawalsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {withdrawalsQuery.isLoading ? (
+                // Show 5 skeleton rows while loading
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableSkeletonRow key={i} cellWidths={[100, 180, 140, 100, 120, 80, 80]} />
+                ))
+              ) : withdrawals.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-20 text-center">
                     <div className="flex flex-col items-center gap-3">
@@ -259,7 +265,7 @@ export default function WithdrawalsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((w) => (
+                withdrawals.map((w) => (
                   <TableRow
                     key={w.id}
                     className="cursor-pointer transition-colors"
@@ -280,14 +286,14 @@ export default function WithdrawalsPage() {
                           className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                           style={{ background: '#eef2ff', color: '#2b4bb9' }}
                         >
-                          {w.affiliate?.fullName.charAt(0) ?? '?'}
+                          {w.vendor?.name?.charAt(0) ?? '?'}
                         </div>
                         <div>
                           <p className="text-sm font-semibold" style={{ color: '#0f172a' }}>
-                            {w.affiliate?.fullName ?? 'Unknown'}
+                            {w.vendor?.name ?? 'Unknown'}
                           </p>
                           <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>
-                            {w.affiliate?.email ?? '—'}
+                            {w.vendor?.email ?? '—'}
                           </p>
                         </div>
                       </div>
@@ -295,10 +301,10 @@ export default function WithdrawalsPage() {
 
                     <TableCell className="py-5 px-6">
                       <p className="text-sm" style={{ color: '#374151' }}>
-                        {w.affiliate?.bankName ?? '—'}
+                        {w.vendor?.extras?.bankName ?? '—'}
                       </p>
                       <p className="text-xs mt-0.5 font-mono" style={{ color: '#9ca3af' }}>
-                        {w.affiliate?.accountNumber ?? '—'}
+                        {w.vendor?.extras?.accountNumber ?? '—'}
                       </p>
                     </TableCell>
 
@@ -307,7 +313,7 @@ export default function WithdrawalsPage() {
                         className="text-base font-bold tabular-nums"
                         style={{ color: '#0f172a' }}
                       >
-                        NPR {w.amount.toFixed(2)}
+                        {w.currency} {w.amount.toFixed(2)}
                       </span>
                     </TableCell>
 
@@ -322,12 +328,12 @@ export default function WithdrawalsPage() {
                     </TableCell>
 
                     <TableCell className="py-5 px-6">
-                      {w.status === 'pending' ? (
+                      {w.status === 'PENDING' ? (
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelected(w)}
+                          onClick={() => setSelectedId(w.id)}
                           className="h-auto px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#eef2ff]"
                           style={{ color: '#2b4bb9' }}
                         >
@@ -339,7 +345,7 @@ export default function WithdrawalsPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelected(w)}
+                          onClick={() => setSelectedId(w.id)}
                           className="h-auto px-3 py-1.5 rounded-lg text-xs font-semibold"
                         >
                           <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
@@ -353,29 +359,25 @@ export default function WithdrawalsPage() {
             </TableBody>
           </Table>
 
-          {/* Footer */}
-          <div
-            className="flex items-center justify-between px-6 py-4 border-t"
-          >
-            <p className="text-sm text-muted-foreground">
-              Showing <strong className="text-foreground">{filtered.length}</strong> of{' '}
-              <strong className="text-foreground">{withdrawals.length}</strong> requests
-            </p>
-            {stats.pending > 0 && (
-              <span
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-                style={{ background: '#fff8e6', color: '#b45309' }}
-              >
-                {stats.pending} pending review
-              </span>
-            )}
-          </div>
+          {/* Pagination */}
+          {!withdrawalsQuery.isLoading && total > 0 && (
+            <WithdrawalsPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onChange={handlePageChange}
+            />
+          )}
         </div>
       </div>
 
       {/* Review modal */}
-      {selected && (
-        <ReviewModal item={selected} onClose={() => setSelected(null)} onUpdate={handleUpdate} />
+      {selectedId && (
+        <ReviewModal
+          withdrawalId={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
       )}
     </div>
   )

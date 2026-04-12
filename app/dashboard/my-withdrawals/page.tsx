@@ -1,32 +1,46 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
+import { toast } from 'sonner'
+
 import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
-import { DUMMY_WITHDRAWALS, DUMMY_AFFILIATES, DUMMY_EARNINGS } from '@/lib/dummy-data'
-import type { Withdrawal } from '@/lib/types'
+import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { TableSkeletonRow } from '@/components/dashboard/TableSkeletonRow'
+import { WithdrawalsPagination } from '@/components/dashboard/withdrawals/WithdrawalsPagination'
+
+import { useWithdrawalsQuery, useWithdrawalBalanceQuery, useCreateWithdrawal } from '@/hooks/use-withdrawals'
+import { getApiErrorMessage } from '@/lib/api/client'
+
+import type { WithdrawalStatusAPI, WithdrawalListItem } from '@/lib/api/withdrawals'
+
 import {
   Banknote, Clock, CheckCircle, XCircle, Plus, X,
-  ChevronDown, Image as ImageIcon, AlertCircle,
+  Image as ImageIcon, AlertCircle, TrendingUp, Loader2,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { formatRelative } from 'date-fns'
+import StatCardSkeleton from '@/components/common/StatCardSkeleton'
 
-const USER_TO_AFFILIATE: Record<string, string> = {
-  u2: 'af1',
-  u3: 'af2',
-}
+const PAGE_SIZE = 20
 
 // ── Status pill ──────────────────────────────────────────────────────────────
-function StatusPill({ status }: { status: Withdrawal['status'] }) {
-  if (status === 'approved') return (
+function StatusPill({ status }: { status: WithdrawalStatusAPI }) {
+  if (status === 'APPROVED') return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: '#f0fdf4', color: '#15803d' }}>
       <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
       Approved
     </span>
   )
-  if (status === 'rejected') return (
+  if (status === 'REJECTED') return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: '#fef2f2', color: '#b91c1c' }}>
       <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
@@ -42,52 +56,60 @@ function StatusPill({ status }: { status: Withdrawal['status'] }) {
   )
 }
 
-// ── Request Modal ─────────────────────────────────────────────────────────────
+
 function RequestModal({
-  available,
-  affiliate,
+  availableBalance,
+  pendingWithdrawals,
   onClose,
-  onSubmit,
+  createMutation,
+  error
 }: {
-  available: number
-  affiliate: { bankName: string; accountNumber: string } | null
+  availableBalance: number
+  pendingWithdrawals: number
   onClose: () => void
-  onSubmit: (amount: number) => void
+  error?: string
+  createMutation: ReturnType<typeof useCreateWithdrawal>
 }) {
   const [amount, setAmount] = useState('')
+  const [remarks, setRemarks] = useState('')
   const [done, setDone] = useState(false)
   const val = parseFloat(amount)
-  const isValid = !isNaN(val) && val > 0 && val <= available
+  const hasPending = pendingWithdrawals > 0
+  const isValid = !hasPending && !isNaN(val) && val > 0 && val <= availableBalance
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!isValid) return
-    onSubmit(val)
-    setDone(true)
-    setTimeout(onClose, 1600)
+    try {
+      await createMutation.mutateAsync({
+        amount: val,
+        ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
+      })
+      setDone(true)
+      setTimeout(onClose, 1600)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to submit withdrawal request'))
+    }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(19,27,46,0.45)', backdropFilter: 'blur(12px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl animate-fade-in-up overflow-hidden"
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="w-full max-w-sm rounded-[16px] !p-0 gap-0 overflow-hidden outline-none border-none"
         style={{ background: '#fff', boxShadow: '0 32px 80px rgba(19,27,46,0.18)' }}
+        showCloseButton={false}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <DialogTitle className="sr-only">Request Withdrawal</DialogTitle>
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-[#f8faff]">
           <div>
             <h2 className="text-lg font-bold" style={{ color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>
               Request Withdrawal
             </h2>
             <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>Funds will be sent to your registered bank</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9]" style={{ color: '#6b7280' }}>
+          <Button variant="ghost" size="icon" onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9]" style={{ color: '#6b7280' }}>
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {done ? (
@@ -100,102 +122,124 @@ function RequestModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            {hasPending && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: '#fffbeb', border: '1.5px solid #fde68a' }}>
+                <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#b45309' }} />
+                <span className="text-sm font-semibold" style={{ color: '#92400e' }}>
+                  You already have a pending withdrawal request (NPR {pendingWithdrawals.toFixed(2)}). Please wait for it to be processed.
+                </span>
+              </div>
+            )}
+
             {/* Available balance */}
             <div className="rounded-xl p-4 flex items-center justify-between" style={{ background: '#f8faff' }}>
               <div>
                 <p className="text-xs uppercase tracking-widest font-bold mb-0.5" style={{ color: '#9ca3af' }}>Available Balance</p>
                 <p className="text-2xl font-bold" style={{ color: '#0f172a', fontFamily: 'var(--font-display)', letterSpacing: '-0.03em' }}>
-                  ${available.toFixed(2)}
+                  NPR {availableBalance.toFixed(2)}
                 </p>
               </div>
               <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: '#eef2ff' }}>
                 <Banknote className="w-5 h-5" style={{ color: '#2b4bb9' }} />
               </div>
             </div>
-
-            {/* Bank info */}
-            {affiliate && (
-              <div className="rounded-xl px-4 py-3 space-y-0.5" style={{ background: '#f4f5ff', border: '1px solid #dbeafe' }}>
-                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#6b7280' }}>Payout to</p>
-                <p className="text-sm font-semibold mt-1" style={{ color: '#0f172a' }}>{affiliate.bankName}</p>
-                <p className="text-xs font-mono" style={{ color: '#6b7280' }}>{affiliate.accountNumber}</p>
-              </div>
-            )}
+            {error && <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#dc2626' }}>{error}</p>}
 
             {/* Amount input */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: '#9ca3af' }}>
-                Withdraw Amount (USD)
+                Withdraw Amount (NPR)
               </label>
-              <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: '#fff', border: '1.5px solid #e2e8f0' }}
-                onFocus={() => { }} >
-                <span className="text-base font-semibold" style={{ color: '#9ca3af' }}>$</span>
-                <input
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl focus-within:ring-2 ring-primary/20 transition-all border" style={{ background: '#fff', borderColor: '#e2e8f0' }}>
+                <span className="text-base font-semibold" style={{ color: '#9ca3af' }}>NPR</span>
+                <Input
                   type="number"
-                  min="1"
-                  step="0.01"
-                  max={available}
+                  min={1}
+                  step={0.01}
+                  max={availableBalance}
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="flex-1 text-base font-semibold bg-transparent outline-none"
+                  disabled={hasPending}
+                  className="flex-1 text-base font-semibold bg-transparent shadow-none border-0 px-0 h-auto disabled:hover:cursor-not-allowed focus-visible:ring-0"
                   style={{ color: '#0f172a' }}
                 />
-                <button
+                <Button
                   type="button"
-                  onClick={() => setAmount(available.toFixed(2))}
-                  className="text-xs font-bold px-2 py-1 rounded-lg"
+                  variant="ghost"
+                  onClick={() => setAmount((parseFloat(availableBalance.toFixed(2)) - 1).toString())}
+                  disabled={!!hasPending}
+                  className="h-auto text-xs font-bold px-2 py-1 rounded-lg hover:bg-indigo-100 hover:disabled:cursor-not-allowed"
                   style={{ background: '#eef2ff', color: '#2b4bb9' }}
                 >
                   Max
-                </button>
+                </Button>
               </div>
-              {amount && !isValid && (
+              {amount && !hasPending && !isValid && (
                 <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#dc2626' }}>
                   <AlertCircle className="w-3 h-3" />
-                  {val > available ? `Exceeds available balance ($${available.toFixed(2)})` : 'Enter a valid amount'}
+                  {val > availableBalance ? `Exceeds available balance (NPR ${availableBalance.toFixed(2)})` : 'Enter a valid amount'}
                 </p>
               )}
             </div>
 
-            <button
+            {/* Remarks input */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: '#9ca3af' }}>
+                Remarks <span className="font-normal">(optional)</span>
+              </label>
+              <Textarea
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
+                placeholder="Add a note for admin..."
+                disabled={hasPending}
+                rows={2}
+                className="rounded-xl text-sm resize-none focus-visible:ring-primary/20"
+                style={{ borderColor: '#e2e8f0' }}
+              />
+            </div>
+
+            <Button
               type="submit"
-              disabled={!isValid}
-              className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!isValid || createMutation.isPending}
+              className="w-full py-6 rounded-xl text-sm font-bold text-white hover:opacity-90 hover:disabled:cursor-not-allowed disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
             >
-              Submit Request
-            </button>
+              {createMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Submitting...
+                </span>
+              ) : (
+                'Submit Request'
+              )}
+            </Button>
           </form>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-// ── Detail Modal ──────────────────────────────────────────────────────────────
-function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void }) {
+function DetailModal({ item, onClose }: { item: WithdrawalListItem; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(19,27,46,0.45)', backdropFilter: 'blur(12px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl overflow-hidden animate-fade-in-up"
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="w-full max-w-md rounded-[16px] !p-0 gap-0 overflow-hidden outline-none border-none"
         style={{ background: '#fff', boxShadow: '0 32px 80px rgba(19,27,46,0.18)' }}
+        showCloseButton={false}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <DialogTitle className="sr-only">Withdrawal Detail</DialogTitle>
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-[#f8faff]">
           <div>
             <h2 className="text-lg font-bold" style={{ color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>
               Withdrawal Detail
             </h2>
-            <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>ID: {item.id.toUpperCase()}</p>
+            <p className="text-xs mt-0.5 font-mono" style={{ color: '#9ca3af' }}>ID: {item.id.slice(0, 8).toUpperCase()}</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9]" style={{ color: '#6b7280' }}>
+          <Button variant="ghost" size="icon" onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9]" style={{ color: '#6b7280' }}>
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="p-6 space-y-5">
@@ -204,7 +248,7 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
             <div>
               <p className="text-xs uppercase tracking-widest font-bold mb-1" style={{ color: '#9ca3af' }}>Amount Requested</p>
               <p className="text-3xl font-bold" style={{ color: '#0f172a', fontFamily: 'var(--font-display)', letterSpacing: '-0.03em' }}>
-                ${item.amount.toFixed(2)}
+                {item.currency} {item.amount.toFixed(2)}
               </p>
             </div>
             <StatusPill status={item.status} />
@@ -228,8 +272,8 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
             )}
           </div>
 
-          {/* Approved: note + screenshot */}
-          {item.status === 'approved' && (
+          {/* Approved */}
+          {item.status === 'APPROVED' && (
             <>
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: '#f0fdf4', border: '1.5px solid #86efac' }}>
                 <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#16a34a' }} />
@@ -243,11 +287,11 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
                   </p>
                 </div>
               )}
-              {item.paymentScreenshot ? (
+              {item.transactionProof ? (
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>Payment Screenshot</p>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>Payment Proof</p>
                   <img
-                    src={item.paymentScreenshot}
+                    src={item.transactionProof}
                     alt="Payment confirmation"
                     className="w-full rounded-xl object-cover"
                     style={{ border: '1px solid #f1f5f9', maxHeight: '200px' }}
@@ -256,20 +300,27 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
               ) : (
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: '#f8faff', border: '1px dashed #e2e8f0' }}>
                   <ImageIcon className="w-4 h-4 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                  <span className="text-sm" style={{ color: '#9ca3af' }}>No payment screenshot provided by admin.</span>
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>No payment proof provided by admin.</span>
                 </div>
               )}
             </>
           )}
 
-          {/* Rejected: note only */}
-          {item.status === 'rejected' && (
+          {/* Rejected */}
+          {item.status === 'REJECTED' && (
             <>
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: '#fef2f2', border: '1.5px solid #fca5a5' }}>
                 <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#dc2626' }} />
                 <span className="text-sm font-semibold" style={{ color: '#b91c1c' }}>This request was rejected.</span>
               </div>
-              {item.remarks ? (
+              {item.rejectionReason ? (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>Rejection Reason</p>
+                  <p className="text-sm leading-relaxed px-4 py-3 rounded-xl" style={{ background: '#f8faff', color: '#374151', border: '1px solid #f1f5f9' }}>
+                    {item.rejectionReason}
+                  </p>
+                </div>
+              ) : item.remarks ? (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>Rejection Reason</p>
                   <p className="text-sm leading-relaxed px-4 py-3 rounded-xl" style={{ background: '#f8faff', color: '#374151', border: '1px solid #f1f5f9' }}>
@@ -283,7 +334,7 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
           )}
 
           {/* Pending */}
-          {item.status === 'pending' && (
+          {item.status === 'PENDING' && (
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: '#fffbeb', border: '1.5px solid #fde68a' }}>
               <Clock className="w-4 h-4 flex-shrink-0" style={{ color: '#b45309' }} />
               <span className="text-sm font-semibold" style={{ color: '#92400e' }}>Awaiting admin review. You will be notified once processed.</span>
@@ -292,22 +343,23 @@ function DetailModal({ item, onClose }: { item: Withdrawal; onClose: () => void 
         </div>
 
         <div className="px-6 pb-6">
-          <button
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl text-sm font-semibold hover:bg-[#f1f5f9] transition-colors"
+            className="w-full py-6 rounded-xl text-sm font-semibold hover:bg-[#f1f5f9] transition-colors"
             style={{ background: '#f8faff', color: '#6b7280' }}
           >
             Close
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MyWithdrawalsPage() {
   const currentUser = useAuthStore((s) => s.currentUser)
+  const searchParams = useSearchParams()
   const router = useRouter()
 
   useEffect(() => {
@@ -316,215 +368,238 @@ export default function MyWithdrawalsPage() {
     }
   }, [currentUser, router])
 
-  const affiliateId = currentUser ? USER_TO_AFFILIATE[currentUser.id] : null
-  const affiliate = DUMMY_AFFILIATES.find(a => a.id === affiliateId) ?? null
-
-  // Calculate available balance from paid earnings minus approved withdrawals
-  const totalEarned = DUMMY_EARNINGS
-    .filter(e => e.affiliateId === affiliateId && e.status === 'paid')
-    .reduce((s, e) => s + e.commissionAmount, 0)
-
-  const totalWithdrawn = DUMMY_WITHDRAWALS
-    .filter(w => w.affiliateId === affiliateId && w.status === 'approved')
-    .reduce((s, w) => s + w.amount, 0)
-
-  const available = Math.max(0, totalEarned - totalWithdrawn)
-
-  // Local state to allow new requests to appear
-  const [localWithdrawals, setLocalWithdrawals] = useState<Withdrawal[]>(
-    DUMMY_WITHDRAWALS.filter(w => w.affiliateId === affiliateId)
-  )
-
+  const [page, setPage] = useState(Number(searchParams.get('page')) || 1)
   const [showRequest, setShowRequest] = useState(false)
-  const [detailItem, setDetailItem] = useState<Withdrawal | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'all' | Withdrawal['status']>('all')
-
-  const filtered = useMemo(() =>
-    statusFilter === 'all'
-      ? localWithdrawals
-      : localWithdrawals.filter(w => w.status === statusFilter),
-    [localWithdrawals, statusFilter]
+  const [detailItem, setDetailItem] = useState<WithdrawalListItem | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | WithdrawalStatusAPI>(
+    (searchParams.get('status') as 'all' | WithdrawalStatusAPI) || 'all'
   )
 
-  // Stats
-  const pending = localWithdrawals.filter(w => w.status === 'pending').length
-  const approved = localWithdrawals.filter(w => w.status === 'approved').length
-  const rejected = localWithdrawals.filter(w => w.status === 'rejected').length
-  const totalRequested = localWithdrawals.reduce((s, w) => s + w.amount, 0)
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (page !== 1) params.set('page', String(page))
+    const newUrl = params.toString() ? `/dashboard/my-withdrawals?${params.toString()}` : '/dashboard/my-withdrawals'
+    router.replace(newUrl, { scroll: false })
+  }, [statusFilter, page, router])
 
-  function handleNewRequest(amount: number) {
-    const newW: Withdrawal = {
-      id: `w${Date.now()}`,
-      affiliateId: affiliateId ?? '',
-      amount,
-      requestedAt: new Date().toISOString(),
-      status: 'pending',
-    }
-    setLocalWithdrawals(prev => [newW, ...prev])
-  }
+  const { data: balanceData, isLoading: balanceLoading } = useWithdrawalBalanceQuery()
+
+  const { data: withdrawalsData, isLoading: listLoading } = useWithdrawalsQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+  })
+
+  const createMutation = useCreateWithdrawal()
+
+  const items = withdrawalsData?.items ?? []
+  const total = withdrawalsData?.total ?? 0
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const STATS = [
-    { label: 'Available Balance', value: `$${available.toFixed(2)}`, icon: Banknote, bg: '#eef2ff', color: '#2b4bb9' },
-    { label: 'Pending Requests', value: pending, icon: Clock, bg: '#fffbeb', color: '#b45309' },
-    { label: 'Approved', value: approved, icon: CheckCircle, bg: '#f0fdf4', color: '#16a34a' },
-    { label: 'Rejected', value: rejected, icon: XCircle, bg: '#fef2f2', color: '#dc2626' },
+    { label: 'Available Balance', value: balanceData ? `NPR ${balanceData.availableBalance.toFixed(2)}` : '—', icon: Banknote, bg: '#eef2ff', color: '#2b4bb9' },
+    { label: 'Total Earnings', value: balanceData ? `NPR ${balanceData.totalEarnings.toFixed(2)}` : '—', icon: TrendingUp, bg: '#f0fdf4', color: '#16a34a' },
+    { label: 'Pending Amount', value: balanceData ? `NPR ${balanceData.pendingWithdrawals.toFixed(2)}` : '—', icon: Clock, bg: '#fffbeb', color: '#b45309' },
+    { label: 'Approved Amount', value: balanceData ? `NPR ${balanceData.approvedWithdrawals.toFixed(2)}` : '—', icon: CheckCircle, bg: '#f0fdf4', color: '#16a34a' },
   ]
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: 'var(--surface-container-lowest)' }}>
       <Topbar title="Withdrawal Requests" description="Manage your withdrawal requests and track payment status" />
 
-      <div className="flex-1 p-4 md:p-8 space-y-4 md:space-y-6 max-w-[1440px]">
+      <div className="flex-1 p-4 md:p-8 space-y-4 md:space-y-6 max-w-screen-2xl mx-auto w-full">
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {STATS.map(s => {
-            const Icon = s.icon
-            return (
-              <div
-                key={s.label}
-                className="rounded-2xl p-5 flex items-center gap-4"
-                style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)', border: '1px solid #f1f5f9' }}
-              >
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: s.bg }}>
-                  <Icon className="w-5 h-5" style={{ color: s.color }} />
-                </div>
-                <div>
-                  <p className="text-xs font-medium" style={{ color: '#9ca3af' }}>{s.label}</p>
-                  <p className="text-xl font-bold mt-0.5" style={{ color: '#0f172a', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>
-                    {s.value}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
+          {balanceLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <StatCardSkeleton key={i} />
+            ))
+          ) : (
+            STATS.map(s => {
+              const Icon = s.icon
+              return (
+                <Card
+                  key={s.label}
+                  className="rounded-2xl p-3.5 sm:p-5 flex flex-row items-center gap-3 sm:gap-4 overflow-hidden"
+                  style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)', border: '1px solid #f1f5f9' }}
+                >
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: s.bg }}>
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: s.color }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] sm:text-xs font-medium whitespace-normal sm:whitespace-nowrap leading-tight" style={{ color: '#9ca3af' }}>{s.label}</p>
+                    <p className="text-base sm:text-xl font-bold mt-0.5 truncate" style={{ color: '#0f172a', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>
+                      {s.value}
+                    </p>
+                  </div>
+                </Card>
+              )
+            })
+          )}
         </div>
 
-        {/* Toolbar */}
-        <div
+        {/* Toolbar + Table */}
+        <Card
           className="rounded-2xl overflow-hidden"
           style={{ background: '#fff', boxShadow: '0 1px 4px rgba(19,27,46,0.06)', border: '1px solid #f1f5f9' }}
         >
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid #f4f5ff' }}>
             <div>
               <h2 className="text-base font-bold" style={{ color: '#0f172a' }}>Request History</h2>
-              <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>{filtered.length} request{filtered.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>
+                {listLoading ? '...' : `${total} request${total !== 1 ? 's' : ''}`}
+              </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* Status filter */}
-              <div className="relative">
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-                  className="appearance-none pl-3.5 pr-8 py-2 rounded-xl text-sm font-medium outline-none"
-                  style={{ background: '#f8faff', color: '#374151', border: '1px solid #f1f5f9' }}
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => {
+                  setStatusFilter(val as 'all' | WithdrawalStatusAPI)
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger
+                  className="w-[140px] pl-3.5 pr-2 py-2 rounded-xl text-sm font-medium h-auto border-[#f1f5f9] bg-[#f8faff] text-[#374151] focus:ring-0 shadow-none"
                 >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }} />
-              </div>
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <button
+              <Button
                 onClick={() => setShowRequest(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white whitespace-nowrap"
+                disabled={balanceData?.availableBalance === 0}
+                className="flex items-center gap-2 px-4 h-auto py-2 rounded-xl text-sm font-bold text-white whitespace-nowrap"
                 style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
               >
                 <Plus className="w-4 h-4" />
                 New Request
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr style={{ background: '#fafbff', borderBottom: '1px solid #f4f5ff' }}>
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow style={{ background: '#fafbff', borderBottom: '1px solid #f4f5ff' }} className="hover:bg-transparent">
                   {['Request ID', 'Amount', 'Requested On', 'Processed On', 'Status', 'Action'].map(h => (
-                    <th key={h} className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#9ca3af' }}>
+                    <TableHead key={h} className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#9ca3af' }}>
                       {h}
-                    </th>
+                    </TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-16 text-center">
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {listLoading ? (
+                  <>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableSkeletonRow key={i} cellWidths={[100, 80, 120, 120, 100, 100]} />
+                    ))}
+                  </>
+                ) : items.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#f4f5ff' }}>
                           <Banknote className="w-5 h-5" style={{ color: '#9ca3af' }} />
                         </div>
-                        <p className="text-sm font-medium" style={{ color: '#6b7280' }}>No withdrawal requests found</p>
-                        <button
-                          onClick={() => setShowRequest(true)}
-                          className="text-sm font-semibold"
-                          style={{ color: '#2b4bb9' }}
-                        >
-                          Make your first request
-                        </button>
+                        <p className="text-sm font-medium" style={{ color: '#6b7280' }}>
+                          {statusFilter !== 'all'
+                            ? `No ${statusFilter.toLowerCase()} withdrawal requests found`
+                            : 'No withdrawal requests found'}
+                        </p>
+                        {statusFilter === 'all' && (
+                          <Button
+                            variant="link"
+                            onClick={() => setShowRequest(true)}
+                            className="text-sm font-semibold h-auto p-0"
+                            style={{ color: '#2b4bb9' }}
+                          >
+                            Make your first request
+                          </Button>
+                        )}
                       </div>
-                    </td>
-                  </tr>
-                ) : filtered.map(w => (
-                  <tr
+                    </TableCell>
+                  </TableRow>
+                ) : items.map(w => (
+                  <TableRow
                     key={w.id}
                     style={{ borderBottom: '1px solid #f4f5ff' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#fafbff')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td className="py-5 px-6">
+                    <TableCell className="py-5 px-6">
                       <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg" style={{ background: '#eef2ff', color: '#2b4bb9' }}>
-                        {w.id.toUpperCase()}
+                        {w.id.slice(0, 8).toUpperCase()}
                       </span>
-                    </td>
-                    <td className="py-5 px-6">
+                    </TableCell>
+                    <TableCell className="py-5 px-6">
                       <span className="text-sm font-bold tabular-nums" style={{ color: '#0f172a' }}>
-                        ${w.amount.toFixed(2)}
+                        {w.currency} {w.amount.toFixed(2)}
                       </span>
-                    </td>
-                    <td className="py-5 px-6">
+                    </TableCell>
+                    <TableCell className="py-5 px-6">
                       <span className="text-sm" style={{ color: '#6b7280' }}>
-                        {new Date(w.requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatRelative(new Date(w.requestedAt), new Date())}
                       </span>
-                    </td>
-                    <td className="py-5 px-6">
+                    </TableCell>
+                    <TableCell className="py-5 px-6">
                       <span className="text-sm" style={{ color: '#6b7280' }}>
                         {w.processedAt
-                          ? new Date(w.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          ? formatRelative(new Date(w.processedAt), new Date())
                           : '—'}
                       </span>
-                    </td>
-                    <td className="py-5 px-6">
+                    </TableCell>
+                    <TableCell className="py-5 px-6">
                       <StatusPill status={w.status} />
-                    </td>
-                    <td className="py-5 px-6">
-                      <button
+                    </TableCell>
+                    <TableCell className="py-5 px-6">
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setDetailItem(w)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[#eef2ff]"
+                        className="flex h-auto items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[#eef2ff]"
                         style={{ color: '#2b4bb9' }}
                       >
                         View Details
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <WithdrawalsPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={PAGE_SIZE}
+              onChange={setPage}
+            />
+          )}
+        </Card>
       </div>
 
       {/* Modals */}
-      {showRequest && (
+      {showRequest && balanceData && (
         <RequestModal
-          available={available}
-          affiliate={affiliate}
+          availableBalance={balanceData.availableBalance}
+          pendingWithdrawals={balanceData.pendingWithdrawals}
           onClose={() => setShowRequest(false)}
-          onSubmit={handleNewRequest}
+          createMutation={createMutation}
+          error={createMutation.error ? getApiErrorMessage(createMutation.error, 'Failed to submit withdrawal request') : undefined}
         />
       )}
       {detailItem && (

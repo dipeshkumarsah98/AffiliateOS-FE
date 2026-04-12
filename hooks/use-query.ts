@@ -29,8 +29,10 @@ export const queryKeys = {
   stockMovements: createQueryKeys("stockMovements"),
   affiliates: createQueryKeys("affiliates"),
   withdrawals: createQueryKeys("withdrawals"),
+  adminWithdrawals: createQueryKeys("adminWithdrawals"),
   earnings: createQueryKeys("earnings"),
   codVerifications: createQueryKeys("codVerifications"),
+  commissions: createQueryKeys("commissions"),
 };
 
 interface UseApiMutationOptions<TData, TVariables> {

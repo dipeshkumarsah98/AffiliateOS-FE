@@ -1,17 +1,20 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Check, X, XCircle, Upload } from 'lucide-react'
-import type { Withdrawal, Affiliate } from '@/lib/types'
+import { useState, useRef, useEffect } from 'react'
+import { Check, X, XCircle, Upload, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+    useAdminWithdrawalDetailQuery,
+    useApproveWithdrawalMutation,
+    useRejectWithdrawalMutation,
+} from '@/hooks/use-admin-withdrawals'
+import { toast } from 'sonner'
 
-type WithdrawalWithAffiliate = Withdrawal & { affiliate: Affiliate | undefined }
-
-function StatusPill({ status }: { status: Withdrawal['status'] }) {
+function StatusPill({ status }: { status: 'PENDING' | 'APPROVED' | 'REJECTED' }) {
     const map = {
-        pending: { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b', label: 'Pending' },
-        approved: { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Approved' },
-        rejected: { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Rejected' },
+        PENDING: { bg: '#fff8e6', color: '#b45309', dot: '#f59e0b', label: 'Pending' },
+        APPROVED: { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Approved' },
+        REJECTED: { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Rejected' },
     }
     const s = map[status]
     return (
@@ -26,22 +29,55 @@ function StatusPill({ status }: { status: Withdrawal['status'] }) {
 }
 
 interface ReviewModalProps {
-    item: WithdrawalWithAffiliate
+    withdrawalId: string
     onClose: () => void
-    onUpdate: (
-        id: string,
-        status: 'approved' | 'rejected',
-        remarks: string,
-        screenshot?: string
-    ) => void
 }
 
-export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
+export function ReviewModal({ withdrawalId, onClose }: ReviewModalProps) {
+    const { data: item, isLoading, error } = useAdminWithdrawalDetailQuery(withdrawalId)
+
     const [decision, setDecision] = useState<'approved' | 'rejected' | ''>('')
-    const [remarks, setRemarks] = useState(item.remarks ?? '')
-    const [screenshot, setScreenshot] = useState<string | undefined>(item.paymentScreenshot)
-    const [done, setDone] = useState(false)
+    const [remarks, setRemarks] = useState('')
+    const [screenshot, setScreenshot] = useState<string | undefined>()
     const fileRef = useRef<HTMLInputElement>(null)
+
+    const approveMutation = useApproveWithdrawalMutation({
+        onSuccess: () => {
+            toast.success('Withdrawal approved successfully')
+            onClose()
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to approve withdrawal')
+        },
+    })
+
+    const rejectMutation = useRejectWithdrawalMutation({
+        onSuccess: () => {
+            toast.success('Withdrawal rejected')
+            onClose()
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to reject withdrawal')
+        },
+    })
+
+    const isSubmitting = approveMutation.isPending || rejectMutation.isPending
+
+    // Show error toast and close modal if fetch fails
+    useEffect(() => {
+        if (error) {
+            toast.error('Failed to load withdrawal details')
+            onClose()
+        }
+    }, [error, onClose])
+
+    // Initialize remarks from API data when it loads
+    useEffect(() => {
+        if (item) {
+            setRemarks(item.remarks ?? '')
+            setScreenshot(item.transactionProof ?? undefined)
+        }
+    }, [item])
 
     function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
@@ -53,46 +89,45 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
 
     function handleSubmit() {
         if (!decision) return
-        onUpdate(item.id, decision, remarks, screenshot)
-        setDone(true)
-        setTimeout(onClose, 1800)
+
+        if (decision === 'approved') {
+            approveMutation.mutate({
+                id: withdrawalId,
+                payload: {
+                    // TODO: Replace with actual R2 upload URL
+                    transactionProof: 'https://placehold.co/600x400?text=Transaction+Proof',
+                    remarks: remarks.trim(),
+                },
+            })
+        } else {
+            rejectMutation.mutate({
+                id: withdrawalId,
+                payload: {
+                    rejectionReason: remarks.trim(),
+                },
+            })
+        }
     }
 
-    if (done) {
+    // Show loading spinner while fetching
+    if (isLoading || !item) {
         return (
             <div
                 className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                style={{ background: 'rgba(19,27,46,0.5)', backdropFilter: 'blur(12px)' }}
+                style={{ background: 'rgba(19,27,46,0.45)', backdropFilter: 'blur(12px)' }}
             >
                 <div
                     className="w-full max-w-sm rounded-2xl p-10 text-center"
                     style={{ background: '#fff', boxShadow: '0 24px 60px rgba(19,27,46,0.18)' }}
                 >
-                    <div
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
-                        style={{ background: decision === 'approved' ? '#f0fdf4' : '#fef2f2' }}
-                    >
-                        {decision === 'approved' ? (
-                            <Check className="w-8 h-8" style={{ color: '#16a34a' }} />
-                        ) : (
-                            <XCircle className="w-8 h-8" style={{ color: '#dc2626' }} />
-                        )}
-                    </div>
-                    <p
-                        className="text-lg font-bold"
-                        style={{ color: '#0f172a', letterSpacing: '-0.02em' }}
-                    >
-                        Request {decision === 'approved' ? 'Approved' : 'Rejected'}
-                    </p>
-                    <p className="text-sm mt-1.5" style={{ color: '#6b7280' }}>
-                        Withdrawal #{item.id} has been {decision} successfully.
+                    <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin" style={{ color: '#2b4bb9' }} />
+                    <p className="text-sm font-medium" style={{ color: '#6b7280' }}>
+                        Loading withdrawal details...
                     </p>
                 </div>
             </div>
         )
     }
-
-    const af = item.affiliate
 
     return (
         <div
@@ -162,71 +197,69 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                 fontFamily: 'var(--font-display)',
                             }}
                         >
-                            ${item.amount.toFixed(2)}
+                            {item.currency} {item.amount.toFixed(2)}
                         </p>
                     </div>
 
-                    {/* Affiliate info */}
-                    {af && (
-                        <div>
-                            <p
-                                className="text-xs font-bold uppercase tracking-widest mb-3"
-                                style={{ color: '#9ca3af' }}
+                    {/* Vendor info */}
+                    <div>
+                        <p
+                            className="text-xs font-bold uppercase tracking-widest mb-3"
+                            style={{ color: '#9ca3af' }}
+                        >
+                            Vendor
+                        </p>
+                        <div className="flex items-center gap-3.5">
+                            <div
+                                className="w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold flex-shrink-0"
+                                style={{ background: '#eef2ff', color: '#2b4bb9' }}
                             >
-                                Affiliate
-                            </p>
-                            <div className="flex items-center gap-3.5">
-                                <div
-                                    className="w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold flex-shrink-0"
-                                    style={{ background: '#eef2ff', color: '#2b4bb9' }}
-                                >
-                                    {af.fullName.charAt(0)}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: '#0f172a' }}>
-                                        {af.fullName}
-                                    </p>
+                                {item.vendor.name.charAt(0)}
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold" style={{ color: '#0f172a' }}>
+                                    {item.vendor.name}
+                                </p>
+                                <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+                                    {item.vendor.email}
+                                </p>
+                                {item.vendor.phone && (
                                     <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
-                                        {af.email}
+                                        {item.vendor.phone}
                                     </p>
-                                    <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
-                                        {af.contactNumber}
-                                    </p>
-                                </div>
+                                )}
                             </div>
                         </div>
-                    )}
+                    </div>
 
                     {/* Bank details */}
-                    {af && (
-                        <div>
-                            <p
-                                className="text-xs font-bold uppercase tracking-widest mb-3"
-                                style={{ color: '#9ca3af' }}
-                            >
-                                Bank Details
-                            </p>
-                            <div className="space-y-2">
-                                {[
-                                    ['Bank', af.bankName],
-                                    ['Account', af.accountNumber],
-                                ].map(([label, value]) => (
-                                    <div
-                                        key={label}
-                                        className="flex items-center justify-between py-2"
-                                        style={{ borderBottom: '1px solid #f4f5ff' }}
-                                    >
-                                        <span className="text-xs" style={{ color: '#9ca3af' }}>
-                                            {label}
-                                        </span>
-                                        <span className="text-sm font-medium" style={{ color: '#0f172a' }}>
-                                            {value}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                    <div>
+                        <p
+                            className="text-xs font-bold uppercase tracking-widest mb-3"
+                            style={{ color: '#9ca3af' }}
+                        >
+                            Bank Details
+                        </p>
+                        <div className="space-y-2">
+                            {[
+                                ['Bank', item.vendor.extras?.bankName ?? '—'],
+                                ['Account', item.vendor.extras?.accountNumber ?? '—'],
+                            ].map(([label, value]) => (
+                                <div
+                                    key={label}
+                                    className="flex items-center justify-between py-2"
+                                    style={{ borderBottom: '1px solid #f4f5ff' }}
+                                >
+                                    <span className="text-xs" style={{ color: '#9ca3af' }}>
+                                        {label}
+                                    </span>
+                                    <span className="text-sm font-medium" style={{ color: '#0f172a' }}>
+                                        {value}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* ── RIGHT: Action Panel ── */}
@@ -240,7 +273,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                             className="text-xs font-bold uppercase tracking-widest"
                             style={{ color: '#9ca3af' }}
                         >
-                            {item.status === 'pending' ? 'Review Decision' : 'Decision Record'}
+                            {item.status === 'PENDING' ? 'Review Decision' : 'Decision Record'}
                         </p>
                         <button
                             onClick={onClose}
@@ -252,7 +285,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                     </div>
 
                     {/* ── PENDING: show approve/reject form ── */}
-                    {item.status === 'pending' && (
+                    {item.status === 'PENDING' && (
                         <>
                             {/* Decision buttons */}
                             <div>
@@ -388,7 +421,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                     placeholder={
                                         decision === 'rejected'
                                             ? 'Reason for rejection...'
-                                            : 'Add a note for the affiliate...'
+                                            : 'Add a note for the vendor...'
                                     }
                                     rows={3}
                                     className="w-full px-3.5 py-3 rounded-xl text-sm resize-none outline-none transition-all"
@@ -409,7 +442,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                             >
                                 <Button
                                     onClick={handleSubmit}
-                                    disabled={!decision || (decision === 'rejected' && !remarks.trim())}
+                                    disabled={!decision || (decision === 'rejected' && !remarks.trim()) || isSubmitting}
                                     className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                                     style={{
                                         background:
@@ -420,7 +453,12 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                                     : 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)',
                                     }}
                                 >
-                                    {decision === 'approved' ? (
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            {decision === 'approved' ? 'Approving...' : 'Rejecting...'}
+                                        </>
+                                    ) : decision === 'approved' ? (
                                         <>
                                             <Check className="w-4 h-4" /> Approve & Mark Paid
                                         </>
@@ -445,7 +483,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                     )}
 
                     {/* ── APPROVED: show screenshot + note (read-only) ── */}
-                    {item.status === 'approved' && (
+                    {item.status === 'APPROVED' && (
                         <>
                             <div
                                 className="flex items-center gap-2 px-3.5 py-3 rounded-xl"
@@ -468,7 +506,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                 </p>
                             )}
 
-                            {item.paymentScreenshot && (
+                            {item.transactionProof && (
                                 <div>
                                     <p
                                         className="text-xs font-bold uppercase tracking-widest mb-2"
@@ -477,7 +515,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                         Payment Screenshot
                                     </p>
                                     <img
-                                        src={item.paymentScreenshot}
+                                        src={item.transactionProof}
                                         alt="Payment screenshot"
                                         className="w-full rounded-xl object-cover"
                                         style={{ border: '1px solid #f1f5f9', maxHeight: '160px' }}
@@ -523,7 +561,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                     )}
 
                     {/* ── REJECTED: show note only (read-only) ── */}
-                    {item.status === 'rejected' && (
+                    {item.status === 'REJECTED' && (
                         <>
                             <div
                                 className="flex items-center gap-2 px-3.5 py-3 rounded-xl"
@@ -546,7 +584,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                 </p>
                             )}
 
-                            {item.remarks ? (
+                            {(item.rejectionReason || item.remarks) ? (
                                 <div>
                                     <p
                                         className="text-xs font-bold uppercase tracking-widest mb-2"
@@ -562,7 +600,7 @@ export function ReviewModal({ item, onClose, onUpdate }: ReviewModalProps) {
                                             border: '1.5px solid #e2e8f0',
                                         }}
                                     >
-                                        {item.remarks}
+                                        {item.rejectionReason || item.remarks}
                                     </p>
                                 </div>
                             ) : (
