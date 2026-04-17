@@ -9,6 +9,7 @@ import {
     useRejectWithdrawalMutation,
 } from '@/hooks/use-admin-withdrawals'
 import { toast } from 'sonner'
+import { fileUpload } from '@/app/actions/fileUpload'
 
 function StatusPill({ status }: { status: 'PENDING' | 'APPROVED' | 'REJECTED' }) {
     const map = {
@@ -39,6 +40,8 @@ export function ReviewModal({ withdrawalId, onClose }: ReviewModalProps) {
     const [decision, setDecision] = useState<'approved' | 'rejected' | ''>('')
     const [remarks, setRemarks] = useState('')
     const [screenshot, setScreenshot] = useState<string | undefined>()
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [isUploading, setIsUploading] = useState(false)
     const fileRef = useRef<HTMLInputElement>(null)
 
     const approveMutation = useApproveWithdrawalMutation({
@@ -47,6 +50,7 @@ export function ReviewModal({ withdrawalId, onClose }: ReviewModalProps) {
             onClose()
         },
         onError: (error) => {
+            console.log('Approval error:', error)
             toast.error(error.message || 'Failed to approve withdrawal')
         },
     })
@@ -61,7 +65,7 @@ export function ReviewModal({ withdrawalId, onClose }: ReviewModalProps) {
         },
     })
 
-    const isSubmitting = approveMutation.isPending || rejectMutation.isPending
+    const isSubmitting = approveMutation.isPending || rejectMutation.isPending || isUploading
 
     // Show error toast and close modal if fetch fails
     useEffect(() => {
@@ -82,24 +86,79 @@ export function ReviewModal({ withdrawalId, onClose }: ReviewModalProps) {
     function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
         if (!file) return
+
+        // Validate file type
+        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+        if (!validImageTypes.includes(file.type)) {
+            toast.error('Invalid file type. Please upload an image (JPEG, PNG, or WebP)')
+            return
+        }
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024 // 5MB
+        if (file.size > maxSize) {
+            toast.error('File too large. Maximum size is 5MB')
+            return
+        }
+
+        // Store the actual file object
+        setSelectedFile(file)
+
+        // Create preview
         const reader = new FileReader()
         reader.onload = (ev) => setScreenshot(ev.target?.result as string)
         reader.readAsDataURL(file)
     }
 
-    function handleSubmit() {
+    async function handleSubmit() {
         if (!decision) return
 
         if (decision === 'approved') {
+            // Validate that a transaction proof is uploaded
+            if (!selectedFile && !item?.transactionProof) {
+                toast.error('Please upload a transaction proof screenshot')
+                return
+            }
+
+            let transactionProofUrl = item?.transactionProof || ''
+
+            // Upload new file if selected
+            if (selectedFile) {
+                try {
+                    setIsUploading(true)
+
+                    // Create FormData and append the file
+                    const formData = new FormData()
+                    formData.append('file', selectedFile)
+
+                    // Upload to R2
+                    const result = await fileUpload(formData)
+
+                    if (!result.ok || !result.stored?.url) {
+                        toast.error(result.message || 'Failed to upload file')
+                        return
+                    }
+
+                    transactionProofUrl = result.stored.url
+                } catch (error) {
+                    console.error('File upload error:', error)
+                    toast.error('Failed to upload transaction proof. Please try again.')
+                    return
+                } finally {
+                    setIsUploading(false)
+                }
+            }
+
+            // Now submit the approval with the uploaded URL
             approveMutation.mutate({
                 id: withdrawalId,
                 payload: {
-                    // TODO: Replace with actual R2 upload URL
-                    transactionProof: 'https://placehold.co/600x400?text=Transaction+Proof',
+                    transactionProof: transactionProofUrl,
                     remarks: remarks.trim(),
                 },
             })
         } else {
+            // Reject mutation
             rejectMutation.mutate({
                 id: withdrawalId,
                 payload: {
