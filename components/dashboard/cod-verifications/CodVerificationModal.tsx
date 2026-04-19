@@ -4,11 +4,9 @@ import { useState } from "react";
 import {
   Check,
   XCircle,
-  X,
   Package,
   Phone,
   User,
-  CreditCard,
   Loader2,
   Link2,
 } from "lucide-react";
@@ -23,6 +21,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { formatRelative } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import Image from "next/image";
 
 interface CodVerificationModalProps {
   order: CodVerificationItem;
@@ -46,7 +45,6 @@ export function CodVerificationModal({
     order.verification?.verificationStatus || "PENDING";
   const isPending = verificationStatus === "PENDING";
   const isConfirmed = verificationStatus === "CONFIRMED";
-  const isRejected = verificationStatus === "REJECTED";
 
   async function handleSubmit() {
     if (!response) return;
@@ -319,9 +317,11 @@ export function CodVerificationModal({
                     <div key={item.id} className="flex items-center gap-3 py-1">
                       {item.product.images[0] ? (
                         <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
-                          <img
+                          <Image
                             src={item.product.images[0]}
                             alt={item.product.title}
+                            height={150}
+                            width={150}
                             className="w-full h-full object-cover"
                           />
                         </div>

@@ -1,132 +1,133 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
+import { useState } from "react";
 
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
-import { useUpdateOrderStatus } from '@/hooks/use-orders'
+import { useUpdateOrderStatus } from "@/hooks/use-orders";
 
 const STATUS_TRANSITIONS: Record<string, { value: string; label: string }[]> = {
-    PENDING: [
-        { value: 'AWAITING_VERIFICATION', label: 'Awaiting Verification' },
-        { value: 'CANCELLED', label: 'Cancel Order' },
-    ],
-    AWAITING_VERIFICATION: [
-        { value: 'VERIFIED', label: 'Verified' },
-        { value: 'CANCELLED', label: 'Cancel Order' },
-    ],
-    VERIFIED: [
-        { value: 'PROCESSING', label: 'Processing' },
-        { value: 'CANCELLED', label: 'Cancel Order' },
-    ],
-    PROCESSING: [
-        { value: 'SHIPPED', label: 'Shipped' },
-        { value: 'CANCELLED', label: 'Cancel Order' },
-    ],
-    SHIPPED: [{
-        value: 'COMPLETED', label: 'Delivered'
+  PENDING: [
+    { value: "AWAITING_VERIFICATION", label: "Awaiting Verification" },
+    { value: "CANCELLED", label: "Cancel Order" },
+  ],
+  AWAITING_VERIFICATION: [
+    { value: "VERIFIED", label: "Verified" },
+    { value: "CANCELLED", label: "Cancel Order" },
+  ],
+  VERIFIED: [
+    { value: "PROCESSING", label: "Processing" },
+    { value: "CANCELLED", label: "Cancel Order" },
+  ],
+  PROCESSING: [
+    { value: "SHIPPED", label: "Shipped" },
+    { value: "CANCELLED", label: "Cancel Order" },
+  ],
+  SHIPPED: [
+    {
+      value: "COMPLETED",
+      label: "Delivered",
     },
-    { value: 'CANCELLED', label: 'Cancel Order' }
-    ],
-}
+    { value: "CANCELLED", label: "Cancel Order" },
+  ],
+};
 
 interface UpdateStatusDialogProps {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    orderId: string
-    currentStatus: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  orderId: string;
+  currentStatus: string;
 }
 
 export function UpdateStatusDialog({
-    open,
-    onOpenChange,
-    orderId,
-    currentStatus,
+  open,
+  onOpenChange,
+  orderId,
+  currentStatus,
 }: UpdateStatusDialogProps) {
-    const [selected, setSelected] = useState('')
-    const mutation = useUpdateOrderStatus()
+  const [selected, setSelected] = useState("");
+  const mutation = useUpdateOrderStatus();
 
-    const upperStatus = currentStatus.toUpperCase()
-    const options = STATUS_TRANSITIONS[upperStatus] ?? []
+  const upperStatus = currentStatus.toUpperCase();
+  const options = STATUS_TRANSITIONS[upperStatus] ?? [];
 
-    const handleConfirm = () => {
-        if (!selected) return
-        mutation.mutate(
-            { orderId, status: selected },
-            {
-                onSuccess: () => {
-                    setSelected('')
-                    onOpenChange(false)
-                },
-            },
-        )
-    }
+  const handleConfirm = () => {
+    if (!selected) return;
+    mutation.mutate(
+      { orderId, status: selected },
+      {
+        onSuccess: () => {
+          setSelected("");
+          onOpenChange(false);
+        },
+      },
+    );
+  };
 
-    const isCancelAction = selected === 'CANCELLED'
+  const isCancelAction = selected === "CANCELLED";
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Update Order Status</DialogTitle>
-                    <DialogDescription>
-                        Choose the next status for this order. This action cannot be undone.
-                    </DialogDescription>
-                </DialogHeader>
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Order Status</DialogTitle>
+          <DialogDescription>
+            Choose the next status for this order. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
 
-                <div className="py-3">
-                    <Select value={selected} onValueChange={setSelected}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select new status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {options.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+        <div className="py-3">
+          <Select value={selected} onValueChange={setSelected}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select new status" />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-                <DialogFooter className="gap-3 sm:gap-0">
-                    <div className="gap-3">
-
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setSelected('')
-                                onOpenChange(false)
-                            }}
-                            className='mr-2'
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant={isCancelAction ? 'destructive' : 'default'}
-                            disabled={!selected || mutation.isPending}
-                            onClick={handleConfirm}
-                        >
-                            {mutation.isPending ? 'Updating...' : 'Confirm'}
-                        </Button>
-                    </div>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
+        <DialogFooter className="gap-3 sm:gap-0">
+          <div className="gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelected("");
+                onOpenChange(false);
+              }}
+              className="mr-2"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={isCancelAction ? "destructive" : "default"}
+              disabled={!selected || mutation.isPending}
+              onClick={handleConfirm}
+            >
+              {mutation.isPending ? "Updating..." : "Confirm"}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

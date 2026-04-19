@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Topbar } from "@/components/layout/Topbar";
@@ -49,9 +50,19 @@ import {
   StatsCards,
   type StatCardData,
 } from "@/components/dashboard/StatsCards";
-import { CodVerificationModal } from "@/components/dashboard/cod-verifications/CodVerificationModal";
 import { cn, formatCurrency } from "@/lib/utils";
-import { TablePagination } from "@/components/common/TablePagination";
+
+const DynamicTablePagination = dynamic(() =>
+  import("@/components/common/TablePagination").then(
+    (mod) => mod.TablePagination,
+  ),
+);
+
+const DynamicCodVerificationModal = dynamic(() =>
+  import("@/components/dashboard/cod-verifications/CodVerificationModal").then(
+    (mod) => mod.CodVerificationModal,
+  ),
+);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -467,7 +478,7 @@ export default function CodVerificationsPage() {
               </Table>
 
               {!isLoadingList && totalPages > 1 && (
-                <TablePagination
+                <DynamicTablePagination
                   page={currentPage}
                   totalPages={totalPages}
                   total={total}
@@ -481,7 +492,7 @@ export default function CodVerificationsPage() {
       </div>
 
       {selectedOrder && (
-        <CodVerificationModal
+        <DynamicCodVerificationModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
         />

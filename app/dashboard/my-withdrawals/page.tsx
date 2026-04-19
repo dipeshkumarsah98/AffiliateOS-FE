@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { toast } from "sonner";
-
 import { useAuthStore } from "@/stores/auth-store";
 import { Topbar } from "@/components/layout/Topbar";
 import {
@@ -24,9 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   StatsCards,
   type StatCardData,
@@ -45,590 +40,30 @@ import type {
   WithdrawalListItem,
 } from "@/lib/api/withdrawals";
 
-import {
-  Banknote,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Plus,
-  X,
-  Image as ImageIcon,
-  AlertCircle,
-  TrendingUp,
-  Loader2,
-} from "lucide-react";
+import { Banknote, Clock, CheckCircle, Plus, TrendingUp } from "lucide-react";
 import { formatRelative } from "date-fns";
-import { TablePagination } from "@/components/common/TablePagination";
+import dynamic from "next/dynamic";
+import StatusPill from "@/components/dashboard/withdrawals/StatusPill";
 
 const PAGE_SIZE = 20;
 
-// ── Status pill ──────────────────────────────────────────────────────────────
-function StatusPill({ status }: { status: WithdrawalStatusAPI }) {
-  if (status === "APPROVED")
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-        style={{ background: "#f0fdf4", color: "#15803d" }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-        Approved
-      </span>
-    );
-  if (status === "REJECTED")
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-        style={{ background: "#fef2f2", color: "#b91c1c" }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-        Rejected
-      </span>
-    );
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-      style={{ background: "#fffbeb", color: "#b45309" }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-      Pending
-    </span>
-  );
-}
+const DynamicTablePagination = dynamic(() =>
+  import("@/components/common/TablePagination").then(
+    (mod) => mod.TablePagination,
+  ),
+);
 
-function RequestModal({
-  availableBalance,
-  pendingWithdrawals,
-  onClose,
-  createMutation,
-  error,
-}: {
-  availableBalance: number;
-  pendingWithdrawals: number;
-  onClose: () => void;
-  error?: string;
-  createMutation: ReturnType<typeof useCreateWithdrawal>;
-}) {
-  const [amount, setAmount] = useState("");
-  const [remarks, setRemarks] = useState("");
-  const [done, setDone] = useState(false);
-  const val = parseFloat(amount);
-  const hasPending = pendingWithdrawals > 0;
-  const isValid =
-    !hasPending && !isNaN(val) && val > 0 && val <= availableBalance;
+const DynamicRequestModal = dynamic(() =>
+  import("@/components/dashboard/withdrawals/RequestModal").then(
+    (mod) => mod.default,
+  ),
+);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isValid) return;
-    try {
-      await createMutation.mutateAsync({
-        amount: val,
-        ...(remarks.trim() ? { remarks: remarks.trim() } : {}),
-      });
-      setDone(true);
-      setTimeout(onClose, 1600);
-    } catch (error) {
-      toast.error(
-        getApiErrorMessage(error, "Failed to submit withdrawal request"),
-      );
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className="w-full max-w-sm rounded-[16px] !p-0 gap-0 overflow-hidden outline-none border-none"
-        style={{
-          background: "#fff",
-          boxShadow: "0 32px 80px rgba(19,27,46,0.18)",
-        }}
-        showCloseButton={false}
-      >
-        <DialogTitle className="sr-only">Request Withdrawal</DialogTitle>
-        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-[#f8faff]">
-          <div>
-            <h2
-              className="text-lg font-bold"
-              style={{
-                color: "#0f172a",
-                letterSpacing: "-0.02em",
-                fontFamily: "var(--font-display)",
-              }}
-            >
-              Request Withdrawal
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: "#9ca3af" }}>
-              Funds will be sent to your registered bank
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9]"
-            style={{ color: "#6b7280" }}
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {done ? (
-          <div className="px-6 py-10 flex flex-col items-center gap-3">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: "#f0fdf4" }}
-            >
-              <CheckCircle className="w-7 h-7" style={{ color: "#16a34a" }} />
-            </div>
-            <p className="text-base font-bold" style={{ color: "#0f172a" }}>
-              Request Submitted!
-            </p>
-            <p className="text-sm text-center" style={{ color: "#6b7280" }}>
-              Your withdrawal request is now pending admin review.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {hasPending && (
-              <div
-                className="flex items-center gap-2 px-4 py-3 rounded-xl"
-                style={{ background: "#fffbeb", border: "1.5px solid #fde68a" }}
-              >
-                <AlertCircle
-                  className="w-4 h-4 flex-shrink-0"
-                  style={{ color: "#b45309" }}
-                />
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "#92400e" }}
-                >
-                  You already have a pending withdrawal request (NPR{" "}
-                  {pendingWithdrawals.toFixed(2)}). Please wait for it to be
-                  processed.
-                </span>
-              </div>
-            )}
-
-            {/* Available balance */}
-            <div
-              className="rounded-xl p-4 flex items-center justify-between"
-              style={{ background: "#f8faff" }}
-            >
-              <div>
-                <p
-                  className="text-xs uppercase tracking-widest font-bold mb-0.5"
-                  style={{ color: "#9ca3af" }}
-                >
-                  Available Balance
-                </p>
-                <p
-                  className="text-2xl font-bold"
-                  style={{
-                    color: "#0f172a",
-                    fontFamily: "var(--font-display)",
-                    letterSpacing: "-0.03em",
-                  }}
-                >
-                  NPR {availableBalance.toFixed(2)}
-                </p>
-              </div>
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center"
-                style={{ background: "#eef2ff" }}
-              >
-                <Banknote className="w-5 h-5" style={{ color: "#2b4bb9" }} />
-              </div>
-            </div>
-            {error && (
-              <p
-                className="text-xs mt-1.5 flex items-center gap-1"
-                style={{ color: "#dc2626" }}
-              >
-                {error}
-              </p>
-            )}
-
-            {/* Amount input */}
-            <div>
-              <label
-                className="block text-xs font-bold uppercase tracking-widest mb-1.5"
-                style={{ color: "#9ca3af" }}
-              >
-                Withdraw Amount (NPR)
-              </label>
-              <div
-                className="flex items-center gap-2 px-4 py-3 rounded-xl focus-within:ring-2 ring-primary/20 transition-all border"
-                style={{ background: "#fff", borderColor: "#e2e8f0" }}
-              >
-                <span
-                  className="text-base font-semibold"
-                  style={{ color: "#9ca3af" }}
-                >
-                  NPR
-                </span>
-                <Input
-                  type="number"
-                  min={1}
-                  step={0.01}
-                  max={availableBalance}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  disabled={hasPending}
-                  className="flex-1 text-base font-semibold bg-transparent shadow-none border-0 px-0 h-auto disabled:hover:cursor-not-allowed focus-visible:ring-0"
-                  style={{ color: "#0f172a" }}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() =>
-                    setAmount(
-                      (parseFloat(availableBalance.toFixed(2)) - 1).toString(),
-                    )
-                  }
-                  disabled={!!hasPending || availableBalance <= 1}
-                  className="h-auto text-xs font-bold px-2 py-1 rounded-lg hover:bg-indigo-100 hover:disabled:cursor-not-allowed"
-                  style={{ background: "#eef2ff", color: "#2b4bb9" }}
-                >
-                  Max
-                </Button>
-              </div>
-              {amount && !hasPending && !isValid && (
-                <p
-                  className="text-xs mt-1.5 flex items-center gap-1"
-                  style={{ color: "#dc2626" }}
-                >
-                  <AlertCircle className="w-3 h-3" />
-                  {val > availableBalance
-                    ? `Exceeds available balance (NPR ${availableBalance.toFixed(2)})`
-                    : "Enter a valid amount"}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                className="block text-xs font-bold uppercase tracking-widest mb-1.5"
-                style={{ color: "#9ca3af" }}
-              >
-                Remarks <span className="font-normal">(optional)</span>
-              </label>
-              <Textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Add a note for admin..."
-                disabled={hasPending}
-                rows={2}
-                className="rounded-xl text-sm resize-none focus-visible:ring-primary/20"
-                style={{ borderColor: "#e2e8f0" }}
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={!isValid || createMutation.isPending}
-              className="w-full py-6 rounded-xl text-sm font-bold text-white hover:opacity-90 hover:disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                background: "linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)",
-              }}
-            >
-              {createMutation.isPending ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Submitting...
-                </span>
-              ) : (
-                "Submit Request"
-              )}
-            </Button>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DetailModal({
-  item,
-  onClose,
-}: {
-  item: WithdrawalListItem;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className="w-full max-w-md rounded-[16px] !p-0 gap-0 overflow-hidden outline-none border-none"
-        style={{
-          background: "#fff",
-          boxShadow: "0 32px 80px rgba(19,27,46,0.18)",
-        }}
-        showCloseButton={false}
-      >
-        <DialogTitle className="sr-only">Withdrawal Detail</DialogTitle>
-        <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-[#f8faff]">
-          <div>
-            <h2
-              className="text-lg font-bold"
-              style={{
-                color: "#0f172a",
-                letterSpacing: "-0.02em",
-                fontFamily: "var(--font-display)",
-              }}
-            >
-              Withdrawal Detail
-            </h2>
-            <p
-              className="text-xs mt-0.5 font-mono"
-              style={{ color: "#9ca3af" }}
-            >
-              ID: {item.id.slice(0, 8).toUpperCase()}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f1f5f9]"
-            style={{ color: "#6b7280" }}
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <div className="p-6 space-y-5">
-          {/* Amount + status */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="text-xs uppercase tracking-widest font-bold mb-1"
-                style={{ color: "#9ca3af" }}
-              >
-                Amount Requested
-              </p>
-              <p
-                className="text-3xl font-bold"
-                style={{
-                  color: "#0f172a",
-                  fontFamily: "var(--font-display)",
-                  letterSpacing: "-0.03em",
-                }}
-              >
-                {item.currency} {item.amount.toFixed(2)}
-              </p>
-            </div>
-            <StatusPill status={item.status} />
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl p-3" style={{ background: "#f8faff" }}>
-              <p
-                className="text-xs uppercase tracking-widest font-bold mb-1"
-                style={{ color: "#9ca3af" }}
-              >
-                Requested
-              </p>
-              <p className="text-sm font-semibold" style={{ color: "#0f172a" }}>
-                {new Date(item.requestedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-            {item.processedAt && (
-              <div className="rounded-xl p-3" style={{ background: "#f8faff" }}>
-                <p
-                  className="text-xs uppercase tracking-widest font-bold mb-1"
-                  style={{ color: "#9ca3af" }}
-                >
-                  Processed
-                </p>
-                <p
-                  className="text-sm font-semibold"
-                  style={{ color: "#0f172a" }}
-                >
-                  {new Date(item.processedAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Approved */}
-          {item.status === "APPROVED" && (
-            <>
-              <div
-                className="flex items-center gap-2 px-4 py-3 rounded-xl"
-                style={{ background: "#f0fdf4", border: "1.5px solid #86efac" }}
-              >
-                <CheckCircle
-                  className="w-4 h-4 flex-shrink-0"
-                  style={{ color: "#16a34a" }}
-                />
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "#15803d" }}
-                >
-                  Payment has been approved and processed.
-                </span>
-              </div>
-              {item.remarks && (
-                <div>
-                  <p
-                    className="text-xs font-bold uppercase tracking-widest mb-2"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    Admin Note
-                  </p>
-                  <p
-                    className="text-sm leading-relaxed px-4 py-3 rounded-xl"
-                    style={{
-                      background: "#f8faff",
-                      color: "#374151",
-                      border: "1px solid #f1f5f9",
-                    }}
-                  >
-                    {item.remarks}
-                  </p>
-                </div>
-              )}
-              {item.transactionProof ? (
-                <div>
-                  <p
-                    className="text-xs font-bold uppercase tracking-widest mb-2"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    Payment Proof
-                  </p>
-                  <img
-                    src={item.transactionProof}
-                    alt="Payment confirmation"
-                    className="w-full rounded-xl object-cover"
-                    style={{ border: "1px solid #f1f5f9", maxHeight: "200px" }}
-                  />
-                </div>
-              ) : (
-                <div
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                  style={{
-                    background: "#f8faff",
-                    border: "1px dashed #e2e8f0",
-                  }}
-                >
-                  <ImageIcon
-                    className="w-4 h-4 flex-shrink-0"
-                    style={{ color: "#9ca3af" }}
-                  />
-                  <span className="text-sm" style={{ color: "#9ca3af" }}>
-                    No payment proof provided by admin.
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Rejected */}
-          {item.status === "REJECTED" && (
-            <>
-              <div
-                className="flex items-center gap-2 px-4 py-3 rounded-xl"
-                style={{ background: "#fef2f2", border: "1.5px solid #fca5a5" }}
-              >
-                <XCircle
-                  className="w-4 h-4 flex-shrink-0"
-                  style={{ color: "#dc2626" }}
-                />
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "#b91c1c" }}
-                >
-                  This request was rejected.
-                </span>
-              </div>
-              {item.rejectionReason ? (
-                <div>
-                  <p
-                    className="text-xs font-bold uppercase tracking-widest mb-2"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    Rejection Reason
-                  </p>
-                  <p
-                    className="text-sm leading-relaxed px-4 py-3 rounded-xl"
-                    style={{
-                      background: "#f8faff",
-                      color: "#374151",
-                      border: "1px solid #f1f5f9",
-                    }}
-                  >
-                    {item.rejectionReason}
-                  </p>
-                </div>
-              ) : item.remarks ? (
-                <div>
-                  <p
-                    className="text-xs font-bold uppercase tracking-widest mb-2"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    Rejection Reason
-                  </p>
-                  <p
-                    className="text-sm leading-relaxed px-4 py-3 rounded-xl"
-                    style={{
-                      background: "#f8faff",
-                      color: "#374151",
-                      border: "1px solid #f1f5f9",
-                    }}
-                  >
-                    {item.remarks}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm" style={{ color: "#9ca3af" }}>
-                  No reason provided by admin.
-                </p>
-              )}
-            </>
-          )}
-
-          {/* Pending */}
-          {item.status === "PENDING" && (
-            <div
-              className="flex items-center gap-2 px-4 py-3 rounded-xl"
-              style={{ background: "#fffbeb", border: "1.5px solid #fde68a" }}
-            >
-              <Clock
-                className="w-4 h-4 flex-shrink-0"
-                style={{ color: "#b45309" }}
-              />
-              <span
-                className="text-sm font-semibold"
-                style={{ color: "#92400e" }}
-              >
-                Awaiting admin review. You will be notified once processed.
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 pb-6">
-          <Button
-            variant="ghost"
-            onClick={onClose}
-            className="w-full py-6 rounded-xl text-sm font-semibold hover:bg-[#f1f5f9] transition-colors"
-            style={{ background: "#f8faff", color: "#6b7280" }}
-          >
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+const DynamicDetailModal = dynamic(() =>
+  import("@/components/dashboard/withdrawals/DetailModal").then(
+    (mod) => mod.default,
+  ),
+);
 
 export default function MyWithdrawalsPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
@@ -926,7 +361,7 @@ export default function MyWithdrawalsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <TablePagination
+            <DynamicTablePagination
               page={page}
               totalPages={totalPages}
               total={total}
@@ -939,7 +374,7 @@ export default function MyWithdrawalsPage() {
 
       {/* Modals */}
       {showRequest && balanceData && (
-        <RequestModal
+        <DynamicRequestModal
           availableBalance={balanceData.availableBalance}
           pendingWithdrawals={balanceData.pendingWithdrawals}
           onClose={() => setShowRequest(false)}
@@ -955,7 +390,10 @@ export default function MyWithdrawalsPage() {
         />
       )}
       {detailItem && (
-        <DetailModal item={detailItem} onClose={() => setDetailItem(null)} />
+        <DynamicDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+        />
       )}
     </div>
   );

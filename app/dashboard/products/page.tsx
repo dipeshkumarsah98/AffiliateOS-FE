@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Topbar } from "@/components/layout/Topbar";
@@ -19,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ProductDetailDialog } from "@/components/dashboard/products/ProductDetailDialog";
 import { ProductsTableBody } from "@/components/dashboard/products/ProductsTableBody";
 import {
   Search,
@@ -30,9 +30,24 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TablePagination } from "@/components/common/TablePagination";
 
-const PAGE_SIZE = 5;
+const DynamicProductDetailDialog = dynamic(
+  () =>
+    import("@/components/dashboard/products/ProductDetailDialog").then(
+      (mod) => mod.ProductDetailDialog,
+    ),
+  { ssr: false },
+);
+
+const DynamicTablePagination = dynamic(
+  () =>
+    import("@/components/common/TablePagination").then(
+      (mod) => mod.TablePagination,
+    ),
+  { ssr: false },
+);
+
+const PAGE_SIZE = 10;
 
 export default function ProductsPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
@@ -192,7 +207,7 @@ export default function ProductsPage() {
           </Table>
 
           {!productsQuery.isLoading && totalPages > 1 && (
-            <TablePagination
+            <DynamicTablePagination
               page={safePage}
               totalPages={totalPages}
               total={totalProducts}
@@ -203,14 +218,16 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <ProductDetailDialog
-        product={selectedProduct}
-        onClose={() => setSelectedProduct(null)}
-        onAdjustStock={(productId) => {
-          router.push(`/dashboard/products/${productId}/stock`);
-          setSelectedProduct(null);
-        }}
-      />
+      {selectedProduct && (
+        <DynamicProductDetailDialog
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onAdjustStock={(productId) => {
+            router.push(`/dashboard/products/${productId}/stock`);
+            setSelectedProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 }

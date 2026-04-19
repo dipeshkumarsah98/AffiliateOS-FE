@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   RefreshCw,
@@ -25,7 +25,6 @@ import { OrderAddressCard } from "@/components/dashboard/orders/OrderAddressCard
 import { OrderPaymentCard } from "@/components/dashboard/orders/OrderPaymentCard";
 import { OrderCustomerCard } from "@/components/dashboard/orders/OrderCustomerCard";
 import { OrderVerificationCard } from "@/components/dashboard/orders/OrderVerificationCard";
-import { UpdateStatusDialog } from "@/components/dashboard/orders/UpdateStatusDialog";
 
 import { useOrderDetailQuery } from "@/hooks/use-orders";
 import { useAuthStore } from "@/stores/auth-store";
@@ -34,6 +33,12 @@ import { formatCurrency } from "@/lib/utils";
 
 const TERMINAL_STATUSES = ["COMPLETED", "CANCELLED"];
 const NON_UPDATABLE_STATUSES = [...TERMINAL_STATUSES, "AWAITING_VERIFICATION"];
+
+const DynamicUpdateStatusDialog = dynamic(() =>
+  import("@/components/dashboard/orders/UpdateStatusDialog").then(
+    (mod) => mod.UpdateStatusDialog,
+  ),
+);
 
 function OrderDetailSkeleton() {
   return (
@@ -324,7 +329,7 @@ export default function OrderDetailPage() {
 
             {/* Status update dialog */}
             {canUpdateStatus && (
-              <UpdateStatusDialog
+              <DynamicUpdateStatusDialog
                 open={statusDialogOpen}
                 onOpenChange={setStatusDialogOpen}
                 orderId={order.id}

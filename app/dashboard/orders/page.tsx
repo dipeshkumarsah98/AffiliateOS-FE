@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Topbar } from "@/components/layout/Topbar";
@@ -41,9 +42,12 @@ import { format } from "date-fns";
 import { useDebounce } from "@/hooks/use-debounce";
 import { formatRelative } from "@/lib/stock-utils";
 import { cn, formatCurrency } from "@/lib/utils";
-import { TablePagination } from "@/components/common/TablePagination";
 
-const PAGE_SIZE = 5;
+const DynamicTablePagination = dynamic(() =>
+  import("@/components/common/TablePagination").then(
+    (mod) => mod.TablePagination,
+  ),
+);
 
 function getDefaultDateFilter(): DateFilterValue {
   return {
@@ -55,6 +59,7 @@ function getDefaultDateFilter(): DateFilterValue {
   };
 }
 
+const PAGE_SIZE = 10;
 export default function OrdersPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const searchParams = useSearchParams();
@@ -466,7 +471,7 @@ export default function OrdersPage() {
           )}
 
           {!ordersQuery.isLoading && totalPages > 1 && (
-            <TablePagination
+            <DynamicTablePagination
               page={safePage}
               totalPages={totalPages}
               total={totalItems}
