@@ -7,13 +7,9 @@ import {
   Users,
   Store,
   ShieldCheck,
-  Briefcase,
   Search,
   RefreshCw,
   ChevronDown,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
   Eye,
 } from "lucide-react";
 
@@ -29,196 +25,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
 import { useAuthStore } from "@/stores/auth-store";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useSearchUsers } from "@/hooks/use-users";
-
-import StatCardSkeleton from "@/components/common/StatCardSkeleton";
+import {
+  StatsCards,
+  type StatCardData,
+} from "@/components/dashboard/StatsCards";
 import { TableSkeletonRow } from "@/components/dashboard/TableSkeletonRow";
-// Note: WithdrawalsPagination uses typical pagination logic, but for self-containment we'll implement inline mimicking their logic.
 import { toast } from "sonner";
-
-// ── Constants & Helpers ──────────────────────────────────────────────────────
+import RoleBadge from "@/components/common/RoleBadge";
+import UserAvatar from "@/components/common/UserAvatar";
+import { TablePagination } from "@/components/common/TablePagination";
 
 const PAGE_SIZE = 20;
-
-function RoleBadge({ role }: { role: string }) {
-  const map: Record<
-    string,
-    { bg: string; color: string; dot: string; label: string }
-  > = {
-    admin: { bg: "#fff8e6", color: "#b45309", dot: "#f59e0b", label: "Admin" },
-    vendor: {
-      bg: "#eef2ff",
-      color: "#3730a3",
-      dot: "#6366f1",
-      label: "Vendor",
-    },
-    staff: { bg: "#f3e8ff", color: "#6b21a8", dot: "#9333ea", label: "Staff" },
-    customer: {
-      bg: "#f0fdf4",
-      color: "#15803d",
-      dot: "#22c55e",
-      label: "Customer",
-    },
-  };
-  const s = map[role.toLowerCase()] || {
-    bg: "#f1f5f9",
-    color: "#475569",
-    dot: "#94a3b8",
-    label: role.toUpperCase(),
-  };
-
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider"
-      style={{ background: s.bg, color: s.color }}
-    >
-      <span
-        className="w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ background: s.dot }}
-      />
-      {s.label}
-    </span>
-  );
-}
-
-function UserAvatar({ name }: { name: string }) {
-  const safeName = name || "?";
-  const initials = safeName
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const colors = [
-    ["#dbeafe", "#1d4ed8"],
-    ["#dcfce7", "#166534"],
-    ["#fce7f3", "#9d174d"],
-    ["#fef9c3", "#92400e"],
-    ["#ede9fe", "#6d28d9"],
-    ["#fee2e2", "#991b1b"],
-  ];
-  const charCode = safeName.charCodeAt(0) || 0;
-  const idx = charCode % colors.length;
-
-  return (
-    <div
-      className="w-8 h-8 rounded-full flex shrink-0 items-center justify-center text-xs font-bold"
-      style={{ background: colors[idx][0], color: colors[idx][1] }}
-    >
-      {initials}
-    </div>
-  );
-}
-
-function Pagination({
-  page,
-  totalPages,
-  total,
-  pageSize,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-  pageSize: number;
-  onChange: (p: number) => void;
-}) {
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
-
-  const pages: (number | "...")[] = [];
-  if (totalPages <= 5) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (page > 3) pages.push("...");
-    for (
-      let i = Math.max(2, page - 1);
-      i <= Math.min(totalPages - 1, page + 1);
-      i++
-    ) {
-      pages.push(i);
-    }
-    if (page < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-  }
-
-  return (
-    <div
-      className="flex items-center justify-between px-6 py-4"
-      style={{ borderTop: "1px solid #f4f5ff" }}
-    >
-      <span className="text-sm" style={{ color: "#6b7280" }}>
-        Showing{" "}
-        <strong className="font-semibold" style={{ color: "#0f172a" }}>
-          {from}
-        </strong>{" "}
-        to{" "}
-        <strong className="font-semibold" style={{ color: "#0f172a" }}>
-          {to}
-        </strong>{" "}
-        of{" "}
-        <strong className="font-semibold" style={{ color: "#0f172a" }}>
-          {total}
-        </strong>{" "}
-        users
-      </span>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onChange(page - 1)}
-          disabled={page === 1}
-          className="w-8 h-8 rounded-lg hover:bg-muted"
-          style={{ color: "#9ca3af" }}
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        {pages.map((p, i) =>
-          p === "..." ? (
-            <span
-              key={`e${i}`}
-              className="w-8 h-8 flex items-center justify-center text-sm"
-              style={{ color: "#9ca3af" }}
-            >
-              ...
-            </span>
-          ) : (
-            <Button
-              key={p}
-              variant="ghost"
-              size="icon"
-              onClick={() => onChange(p as number)}
-              className="w-8 h-8 rounded-lg text-sm font-medium"
-              style={
-                p === page
-                  ? { background: "#2b4bb9", color: "#fff" }
-                  : { background: "transparent", color: "#374151" }
-              }
-            >
-              {p}
-            </Button>
-          ),
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
-          className="w-8 h-8 rounded-lg hover:bg-muted"
-          style={{ color: "#9ca3af" }}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UserManagementPage() {
   const router = useRouter();
@@ -264,6 +84,9 @@ export default function UserManagementPage() {
     setPage(1);
   }, [debouncedSearch, roleFilter]);
 
+  function handlePage(p: number) {
+    setPage(Math.max(1, Math.min(p, totalPages)));
+  }
   // Fetch API
   const rolesArr = roleFilter !== "all" ? [roleFilter] : undefined;
   const { data, isLoading } = useSearchUsers(
@@ -278,53 +101,28 @@ export default function UserManagementPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const isFiltering = search !== debouncedSearch;
 
-  // To build stats natively, since there's no endpoint, we approximate
-  // using total from standard responses or just general place holders.
-  const STAT_CARDS = [
+  // Build stats cards with proper typing
+  const statCards: StatCardData[] = [
     {
       label: "Total Users",
       value: isLoading ? "—" : roleFilter === "all" ? total : "...",
-      icon: (
-        <div
-          className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: "#eef2ff" }}
-        >
-          <Users
-            className="w-4 h-4 sm:w-5 sm:h-5"
-            style={{ color: "#2b4bb9" }}
-          />
-        </div>
-      ),
+      icon: <Users />,
+      iconBg: "#eef2ff",
+      iconColor: "#2b4bb9",
     },
     {
       label: "Vendors",
       value: isLoading ? "—" : roleFilter === "vendor" ? total : "...",
-      icon: (
-        <div
-          className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: "#eef2ff" }}
-        >
-          <Store
-            className="w-4 h-4 sm:w-5 sm:h-5"
-            style={{ color: "#3730a3" }}
-          />
-        </div>
-      ),
+      icon: <Store />,
+      iconBg: "#eef2ff",
+      iconColor: "#3730a3",
     },
     {
       label: "Customers",
       value: isLoading ? "—" : roleFilter === "customer" ? total : "...",
-      icon: (
-        <div
-          className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: "#f0fdf4" }}
-        >
-          <Users
-            className="w-4 h-4 sm:w-5 sm:h-5"
-            style={{ color: "#15803d" }}
-          />
-        </div>
-      ),
+      icon: <Users />,
+      iconBg: "#f0fdf4",
+      iconColor: "#15803d",
     },
     {
       label: "Admins & Staff",
@@ -333,17 +131,9 @@ export default function UserManagementPage() {
         : roleFilter === "admin" || roleFilter === "staff"
           ? total
           : "...",
-      icon: (
-        <div
-          className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: "#fffbeb" }}
-        >
-          <ShieldCheck
-            className="w-4 h-4 sm:w-5 sm:h-5"
-            style={{ color: "#b45309" }}
-          />
-        </div>
-      ),
+      icon: <ShieldCheck />,
+      iconBg: "#fffbeb",
+      iconColor: "#b45309",
     },
   ];
 
@@ -359,43 +149,11 @@ export default function UserManagementPage() {
 
       <div className="flex-1 p-4 md:p-8 space-y-4 md:space-y-6 max-w-screen-2xl mx-auto w-full">
         {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {isLoading && users.length === 0
-            ? Array.from({ length: 4 }).map((_, i) => (
-                <StatCardSkeleton key={i} />
-              ))
-            : STAT_CARDS.map((stat, i) => (
-                <Card
-                  key={i}
-                  className="rounded-2xl p-3.5 sm:p-5 flex flex-row items-center gap-3 sm:gap-4 overflow-hidden"
-                  style={{
-                    background: "#fff",
-                    boxShadow: "0 1px 4px rgba(19,27,46,0.06)",
-                    border: "1px solid #f1f5f9",
-                  }}
-                >
-                  {stat.icon}
-                  <div className="min-w-0">
-                    <p
-                      className="text-[11px] sm:text-xs font-medium whitespace-normal sm:whitespace-nowrap leading-tight"
-                      style={{ color: "#9ca3af" }}
-                    >
-                      {stat.label}
-                    </p>
-                    <p
-                      className="text-base sm:text-xl font-bold mt-0.5 truncate"
-                      style={{
-                        color: "#0f172a",
-                        fontFamily: "var(--font-display)",
-                        letterSpacing: "-0.02em",
-                      }}
-                    >
-                      {stat.value}
-                    </p>
-                  </div>
-                </Card>
-              ))}
-        </div>
+        <StatsCards
+          stats={statCards}
+          isLoading={isLoading && users.length === 0}
+          columns={4}
+        />
 
         {/* Main Card with Search, Filters & Table */}
         <Card
@@ -481,8 +239,7 @@ export default function UserManagementPage() {
                   ].map((h) => (
                     <TableHead
                       key={h}
-                      className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider"
-                      style={{ color: "#9ca3af" }}
+                      className="py-4 px-6 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground"
                     >
                       {h}
                     </TableHead>
@@ -621,14 +378,13 @@ export default function UserManagementPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
-          {!isLoading && total > 0 && (
-            <Pagination
+          {!isLoading && totalPages > 1 && (
+            <TablePagination
               page={page}
               totalPages={totalPages}
               total={total}
               pageSize={PAGE_SIZE}
-              onChange={setPage}
+              onChange={handlePage}
             />
           )}
         </Card>
