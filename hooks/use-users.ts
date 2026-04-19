@@ -5,10 +5,16 @@ import type { SearchUsersParams } from "@/lib/api/users";
 
 import { queryKeys } from "./use-query";
 
-export function useSearchUsers(search: string, page = 1, perPage = 10) {
+export function useSearchUsers(
+  search: string,
+  page = 1,
+  perPage = 10,
+  roles?: string[],
+) {
   return useQuery({
-    queryKey: queryKeys.users.list({ search, page, perPage }),
-    queryFn: () => searchUsers({ search, page, perPage } as SearchUsersParams),
+    queryKey: queryKeys.users.list({ search, page, perPage, roles }),
+    queryFn: () =>
+      searchUsers({ search, page, perPage, role: roles } as SearchUsersParams),
     // enabled: search.trim().length > 0,
     // Keep previous data while fetching new results for smooth UX
     placeholderData: (previousData) => previousData,

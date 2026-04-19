@@ -195,9 +195,13 @@ export interface CreateOrderResponse {
 
 export type CreateOrderPayload = Omit<
   OrderFormData,
-  "sameAsShipping" | "customerMode"
+  "sameAsShipping" | "customerMode" | "productId" | "quantity"
 > & {
   userId?: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+  }>;
   billingAddress: OrderFormData["sameAsShipping"] extends true
     ? OrderFormData["shippingAddress"]
     : OrderFormData["billingAddress"];
@@ -219,12 +223,47 @@ export interface ValidateAffiliateCodeResponse {
   };
 }
 
+export interface VerifyOrderItem {
+  productId: string;
+  productTitle: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  availableStock: number;
+}
+
+export interface VerifyOrderResponse {
+  items: VerifyOrderItem[];
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  shippingAmount: number;
+  totalAmount: number;
+  currency: string;
+  affiliateCode?: string;
+  affiliateDiscount?: {
+    type: "PERCENTAGE" | "FIXED";
+    value: number;
+    amount: number;
+  };
+}
+
 export async function createOrder(data: CreateOrderPayload): Promise<Order> {
   const { data: res } = await apiClient.post<CreateOrderResponse>(
     "/orders",
     data,
   );
   return res.order;
+}
+
+export async function verifyOrder(
+  data: CreateOrderPayload,
+): Promise<VerifyOrderResponse> {
+  const { data: res } = await apiClient.post<VerifyOrderResponse>(
+    "/orders/verify",
+    data,
+  );
+  return res;
 }
 
 export async function validateAffiliateCodeAPI(

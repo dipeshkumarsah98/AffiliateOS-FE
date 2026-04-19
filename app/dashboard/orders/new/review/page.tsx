@@ -17,75 +17,35 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Topbar } from "@/components/layout/Topbar";
 import { loadOrderFormDraft, type OrderFormData } from "@/lib/order-form-store";
-import { useCreateOrder, useValidateAffiliateCode } from "@/hooks/use-orders";
+import { useCreateOrder, useVerifyOrder } from "@/hooks/use-orders";
 import { useProductsQuery } from "@/hooks/use-products";
 import { formatCurrency } from "@/lib/utils";
-import type { ValidateAffiliateCodeResponse } from "@/lib/api/orders";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Helper to format addresses
+const formatAddress = (address: any) => {
+  if (!address) return "N/A";
+  const parts = [
+    address.street_address,
+    address.city,
+    address.state,
+    address.postal_code,
+    address.country,
+  ].filter(Boolean);
+  return parts.join(", ");
+};
 
 export default function ReviewOrderPage() {
   const router = useRouter();
   const [draft, setDraft] = useState<OrderFormData | null>(null);
-
-  // We fetch products to display actual product details on the review page
-  const { data: productsData } = useProductsQuery({ page: 1, limit: 1000 });
-  const products = productsData?.items || [];
-
   const createOrderMutation = useCreateOrder();
 
-  // Validate affiliate code if exists
+  // Verify order details and get price breakdown from API
   const {
-    data: affiliateValidation,
-    isLoading: isValidatingAffiliate,
-    isError: affiliateError,
-  } = useValidateAffiliateCode(draft?.affiliateCode || "");
-
-  // Calculate discount based on affiliate validation
-  // Must be called before any conditional returns (Rules of Hooks)
-  const discountInfo = useMemo(() => {
-    if (!draft || !affiliateValidation || affiliateError || !affiliateValidation.isActive) {
-      return { amount: 0, productId: null, type: null, value: 0 };
-    }
-
-    const { product, discountType, discountValue } = affiliateValidation;
-
-    // Find the item in the order that matches the affiliate's product
-    const orderItem = draft.items.find((item) => item.productId === product.id);
-    if (!orderItem) {
-      // Affiliate code is for a product not in this order
-      return { amount: 0, productId: product.id, productTitle: product.title, type: discountType, value: discountValue };
-    }
-
-    const productInOrder = products.find((p) => p.id === orderItem.productId);
-    if (!productInOrder) {
-      return {
-        amount: 0,
-        productId: product.id,
-        productTitle: product.title,
-        type: discountType,
-        value: discountValue
-      };
-    }
-
-    const itemSubtotal = productInOrder.price * orderItem.quantity;
-    let discountAmount = 0;
-
-    if (discountType === "PERCENTAGE") {
-      discountAmount = (itemSubtotal * discountValue) / 100;
-    } else if (discountType === "FIXED") {
-      discountAmount = discountValue;
-    }
-
-    return {
-      amount: discountAmount,
-      productId: product.id,
-      productTitle: product.title,
-      type: discountType,
-      value: discountValue,
-      appliedToItem: !!orderItem,
-    };
-  }, [draft, affiliateValidation, affiliateError, products]);
-
-  console.log("Calculated discount info:", discountInfo);
+    data: verifiedOrder,
+    isLoading: isVerifying,
+    error: verifyError,
+  } = useVerifyOrder(draft);
 
   useEffect(() => {
     const savedDraft = loadOrderFormDraft();
@@ -102,35 +62,37 @@ export default function ReviewOrderPage() {
     return null; // Or a loading spinner
   }
 
-  // Helper to format addresses
-  const formatAddress = (address: any) => {
-    if (!address) return "N/A";
-    const parts = [
-      address.street_address,
-      address.city,
-      address.state,
-      address.postal_code,
-      address.country,
-    ].filter(Boolean);
-    return parts.join(", ");
-  };
-
-  const getProductDetails = (id: string) => {
-    return products.find((p) => p.id === id);
-  };
-
-  // Calculate totals
-  const subtotal = draft.items.reduce((sum, item) => {
-    const product = getProductDetails(item.productId);
-    const price = product ? product.price : 0;
-    return sum + price * item.quantity;
-  }, 0);
-
-  // Hardcoded for now. Could calculate shipping based on regions, or call API
-  const shipping = 0;
-  const discount = discountInfo.amount;
-
-  const total = subtotal + shipping - discount;
+  // Show error if verification failed
+  if (verifyError) {
+    return (
+      <div className="flex flex-col h-full bg-muted/30">
+        <Topbar title="Review Order" />
+        <main className="flex-1 p-6 flex justify-center items-center">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Verification Error
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                {verifyError instanceof Error
+                  ? verifyError.message
+                  : "Failed to verify order. Please try again."}
+              </p>
+              <Button
+                className="mt-4 w-full"
+                onClick={() => router.push("/dashboard/orders/new")}
+              >
+                Go Back
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   const handleSubmit = () => {
     createOrderMutation.mutate(draft);
@@ -160,21 +122,29 @@ export default function ReviewOrderPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Customer Details</CardTitle>
                     {draft.customerId && (
-                      <Badge variant="secondary" className="text-white">Existing Customer</Badge>
+                      <Badge variant="secondary" className="text-white">
+                        Existing Customer
+                      </Badge>
                     )}
                   </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground font-medium">Name:</span>
+                    <span className="text-muted-foreground font-medium">
+                      Name:
+                    </span>
                     <p className="font-medium">{draft.customerName}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground font-medium">Email:</span>
+                    <span className="text-muted-foreground font-medium">
+                      Email:
+                    </span>
                     <p>{draft.customerEmail}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground font-medium">Phone:</span>
+                    <span className="text-muted-foreground font-medium">
+                      Phone:
+                    </span>
                     <p>{draft.customerPhone || "N/A"}</p>
                   </div>
                 </CardContent>
@@ -190,77 +160,112 @@ export default function ReviewOrderPage() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-semibold">Shipping Address</span>
                       {draft.shippingAddressId && (
-                        <Badge variant="outline" className="text-xs">Saved</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          Saved
+                        </Badge>
                       )}
                     </div>
-                    <p className="text-muted-foreground">{formatAddress(draft.shippingAddress)}</p>
+                    <p className="text-muted-foreground">
+                      {formatAddress(draft.shippingAddress)}
+                    </p>
                   </div>
                   <div className="space-y-1 rounded-md bg-muted/50 p-4 border border-border">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-semibold">Billing Address</span>
                       {draft.billingAddressId && (
-                        <Badge variant="outline" className="text-xs">Saved</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          Saved
+                        </Badge>
                       )}
                     </div>
                     <p className="text-muted-foreground">
-                      {draft.sameAsShipping ? "Same as shipping" : formatAddress(draft.billingAddress)}
+                      {draft.sameAsShipping
+                        ? "Same as shipping"
+                        : formatAddress(draft.billingAddress)}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Items */}
+              {/* Product */}
               <Card>
                 <CardHeader>
                   <CardTitle>Order Items</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {draft.items.map((item, index) => {
-                      const product = getProductDetails(item.productId);
-                      const hasDiscount = discountInfo.productId === item.productId && discountInfo.appliedToItem;
-
-                      return (
+                  {isVerifying ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-20 w-full" />
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <span className="animate-pulse">
+                          Verifying order details...
+                        </span>
+                      </div>
+                    </div>
+                  ) : verifiedOrder && verifiedOrder.items.length > 0 ? (
+                    <div className="space-y-3">
+                      {verifiedOrder.items.map((item, index) => (
                         <div
                           key={index}
-                          className={`flex justify-between items-center bg-muted/30 p-3 rounded-lg border ${hasDiscount ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : ''
-                            }`}
+                          className={`flex justify-between items-center bg-muted/30 p-4 rounded-lg border ${
+                            verifiedOrder.affiliateDiscount &&
+                            verifiedOrder.affiliateDiscount.amount > 0
+                              ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20"
+                              : ""
+                          }`}
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="">{product?.title || "Loading..."}</p>
-                              {hasDiscount && (
-                                <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">
-                                  <Tag className="w-3 h-3 mr-1" />
-                                  Discount Applied
-                                </Badge>
-                              )}
+                              <p className="font-medium">{item.productTitle}</p>
+                              {verifiedOrder.affiliateDiscount &&
+                                verifiedOrder.affiliateDiscount.amount > 0 && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs bg-green-100 text-green-700 border-green-300"
+                                  >
+                                    <Tag className="w-3 h-3 mr-1" />
+                                    Discount Applied
+                                  </Badge>
+                                )}
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              Qty: {item.quantity} x {formatCurrency(product?.price || 0, "NRP")}
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Qty: {item.quantity} x{" "}
+                              {formatCurrency(
+                                item.unitPrice,
+                                verifiedOrder.currency,
+                              )}
                             </p>
-                            {hasDiscount && (
-                              <p className="text-xs text-green-600 font-medium mt-1">
-                                {discountInfo.type === "PERCENTAGE"
-                                  ? `${discountInfo.value}% off`
-                                  : `${formatCurrency(discountInfo.value, "NRP")} off`}
+                            {item.availableStock !== undefined && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Stock available: {item.availableStock}
                               </p>
                             )}
+                            {verifiedOrder.affiliateDiscount &&
+                              verifiedOrder.affiliateDiscount.amount > 0 && (
+                                <p className="text-xs text-green-600 font-medium mt-1">
+                                  {verifiedOrder.affiliateDiscount.type ===
+                                  "PERCENTAGE"
+                                    ? `${verifiedOrder.affiliateDiscount.value}% off`
+                                    : `${formatCurrency(verifiedOrder.affiliateDiscount.value, verifiedOrder.currency)} off`}
+                                </p>
+                              )}
                           </div>
                           <div className="text-right">
-                            <div className={hasDiscount ? "text-muted-foreground line-through text-sm" : ""}>
-                              {formatCurrency(product ? product.price * item.quantity : 0, "NRP")}
+                            <div className="font-semibold">
+                              {formatCurrency(
+                                item.totalPrice,
+                                verifiedOrder.currency,
+                              )}
                             </div>
-                            {hasDiscount && (
-                              <div className="font-semibold text-green-600">
-                                {formatCurrency((product ? product.price * item.quantity : 0) - discountInfo.amount, "NRP")}
-                              </div>
-                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Unable to verify order items
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -274,66 +279,78 @@ export default function ReviewOrderPage() {
                     {draft.affiliateCode && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground font-medium">Affiliate Code:</span>
+                          <span className="text-muted-foreground font-medium">
+                            Affiliate Code:
+                          </span>
                           <p className="inline-block px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded">
-                            {draft.affiliateCode}
+                            {verifiedOrder?.affiliateCode ||
+                              draft.affiliateCode}
                           </p>
-                          {isValidatingAffiliate && (
+                          {isVerifying && (
                             <Badge variant="outline" className="text-xs">
-                              <span className="animate-pulse">Validating...</span>
+                              <span className="animate-pulse">
+                                Verifying...
+                              </span>
                             </Badge>
                           )}
-                          {!isValidatingAffiliate && affiliateValidation && affiliateValidation.isActive && (
-                            <Badge variant="default" className="text-xs bg-green-600">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Valid
-                            </Badge>
-                          )}
-                          {!isValidatingAffiliate && affiliateError && (
-                            <Badge variant="destructive" className="text-xs">
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Invalid
-                            </Badge>
-                          )}
+                          {!isVerifying &&
+                            verifiedOrder?.affiliateDiscount &&
+                            verifiedOrder.affiliateDiscount.amount > 0 && (
+                              <Badge
+                                variant="default"
+                                className="text-xs bg-green-600"
+                              >
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Valid
+                              </Badge>
+                            )}
+                          {!isVerifying &&
+                            verifiedOrder &&
+                            (!verifiedOrder.affiliateDiscount ||
+                              verifiedOrder.affiliateDiscount.amount === 0) && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs text-amber-600"
+                              >
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Not Applied
+                              </Badge>
+                            )}
                         </div>
 
-                        {affiliateValidation && affiliateValidation.isActive && (
-                          <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md">
-                            <div className="text-xs space-y-1">
-                              <p>
-                                <span className="font-medium">Discount:</span>{" "}
-                                {discountInfo.type === "PERCENTAGE"
-                                  ? `${discountInfo.value}% off`
-                                  : formatCurrency(discountInfo.value, "NRP") + " off"}
-                              </p>
-                              <p>
-                                <span className="font-medium">Applies to:</span> {discountInfo.productTitle}
-                              </p>
-                              <p>
-                                <span className="font-medium">Vendor:</span> {affiliateValidation.vendor.name}
-                              </p>
-                              {!discountInfo.appliedToItem && (
-                                <p className="text-amber-600 dark:text-amber-500 flex items-start gap-1 mt-2">
-                                  <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
-                                  <span>This discount code is for "{discountInfo.productTitle}" which is not in your order.</span>
+                        {verifiedOrder?.affiliateDiscount &&
+                          verifiedOrder.affiliateDiscount.amount > 0 && (
+                            <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md">
+                              <div className="text-xs space-y-1">
+                                <p>
+                                  <span className="font-medium">Discount:</span>{" "}
+                                  {verifiedOrder.affiliateDiscount.type ===
+                                  "PERCENTAGE"
+                                    ? `${verifiedOrder.affiliateDiscount.value}% off`
+                                    : formatCurrency(
+                                        verifiedOrder.affiliateDiscount.value,
+                                        verifiedOrder.currency,
+                                      ) + " off"}
                                 </p>
-                              )}
+                                <p>
+                                  <span className="font-medium">
+                                    Total Saved:
+                                  </span>{" "}
+                                  {formatCurrency(
+                                    verifiedOrder.affiliateDiscount.amount,
+                                    verifiedOrder.currency,
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        )}
-
-                        {!isValidatingAffiliate && affiliateError && (
-                          <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
-                            <p className="text-xs text-red-600 dark:text-red-500">
-                              This affiliate code is invalid or inactive. Discount will not be applied.
-                            </p>
-                          </div>
-                        )}
+                          )}
                       </div>
                     )}
                     {draft.notes && (
                       <div>
-                        <span className="text-muted-foreground font-medium">Notes:</span>
+                        <span className="text-muted-foreground font-medium">
+                          Notes:
+                        </span>
                         <p className="mt-1 p-3 bg-muted/50 rounded-md border text-muted-foreground italic">
                           {draft.notes}
                         </p>
@@ -342,7 +359,6 @@ export default function ReviewOrderPage() {
                   </CardContent>
                 </Card>
               )}
-
             </div>
 
             {/* Summary Sidebar */}
@@ -353,57 +369,109 @@ export default function ReviewOrderPage() {
                   <CardDescription>Review total amount</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>
-                      {formatCurrency(subtotal, "NRP")}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Shipping</span>
-                    <span>{shipping > 0 ? formatCurrency(shipping, "NRP") : "Free"}</span>
-                  </div>
-                  {discount > 0 && (
-                    <div className="flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-1 text-green-600">
-                        <Tag className="w-3 h-3" />
-                        <span>Discount</span>
+                  {isVerifying ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-6 w-full" />
+                    </div>
+                  ) : verifiedOrder ? (
+                    <>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>
+                          {formatCurrency(
+                            verifiedOrder.subtotal,
+                            verifiedOrder.currency,
+                          )}
+                        </span>
                       </div>
-                      <span className="text-green-600 font-medium">
-                        - {formatCurrency(discount, "NRP")}
-                      </span>
-                    </div>
-                  )}
-                  {isValidatingAffiliate && draft.affiliateCode && (
-                    <div className="flex justify-between items-center text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <span className="animate-pulse">Validating code...</span>
-                      </span>
-                    </div>
-                  )}
-                  <div className="pt-4 border-t flex justify-between items-center font-bold">
-                    <span>Total</span>
-                    <span className="text-base">
-                      {formatCurrency(total, "NRP")}
-                    </span>
-                  </div>
 
-                  <div className="pt-4 space-y-1">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Payment Method</span>
-                    <p className="font-medium">
-                      <Badge variant="default" className="text-white">{draft.paymentMethod}</Badge>
+                      {verifiedOrder.shippingAmount > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">
+                            Shipping
+                          </span>
+                          <span>
+                            {formatCurrency(
+                              verifiedOrder.shippingAmount,
+                              verifiedOrder.currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {verifiedOrder.taxAmount > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Tax</span>
+                          <span>
+                            {formatCurrency(
+                              verifiedOrder.taxAmount,
+                              verifiedOrder.currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {verifiedOrder.discountAmount > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <div className="flex items-center gap-1 text-green-600">
+                            <Tag className="w-3 h-3" />
+                            <span>Discount</span>
+                          </div>
+                          <span className="text-green-600 font-medium">
+                            -{" "}
+                            {formatCurrency(
+                              verifiedOrder.discountAmount,
+                              verifiedOrder.currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="pt-4 border-t flex justify-between items-center font-bold">
+                        <span>Total</span>
+                        <span className="text-base">
+                          {formatCurrency(
+                            verifiedOrder.totalAmount,
+                            verifiedOrder.currency,
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="pt-4 space-y-1">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                          Payment Method
+                        </span>
+                        <p className="font-medium">
+                          <Badge variant="default" className="text-white">
+                            {draft.paymentMethod}
+                          </Badge>
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Unable to calculate totals
                     </p>
-                  </div>
+                  )}
                 </CardContent>
                 <CardFooter>
                   <Button
                     className="w-full"
                     size="lg"
                     onClick={handleSubmit}
-                    disabled={createOrderMutation.isPending}
+                    disabled={
+                      createOrderMutation.isPending ||
+                      isVerifying ||
+                      !verifiedOrder
+                    }
                   >
                     {createOrderMutation.isPending ? (
                       "Processing..."
+                    ) : isVerifying ? (
+                      "Verifying..."
                     ) : (
                       <>
                         <CheckCircle2 className="mr-2 h-4 w-4" />

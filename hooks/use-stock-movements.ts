@@ -21,8 +21,14 @@ export function useCreateStockMovementMutation(productId?: string) {
     mutationFn: (payload: CreateStockMovementPayload) =>
       createStockMovement(payload),
     onSuccess: async () => {
+      // Invalidate stock movements for this product
       await queryClient.invalidateQueries({
         queryKey: queryKeys.stockMovements.list({ productId: productId ?? "" }),
+      });
+
+      // Invalidate all product queries to refresh the product list
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.products.all(),
       });
     },
   });

@@ -37,7 +37,7 @@ export const queryKeys = {
 
 interface UseApiMutationOptions<TData, TVariables> {
   mutationFn: MutationFunction<TData, TVariables>;
-  invalidateKeys?: readonly unknown[][];
+  invalidateKeys?: readonly (readonly unknown[])[];
   onSuccess?: (data: TData) => void;
   onError?: (error: Error) => void;
 }
@@ -55,12 +55,15 @@ export function useApiMutation<TData, TVariables>({
 
   return useMutation({
     mutationFn,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       // Invalidate specified query keys on success
       if (invalidateKeys) {
-        invalidateKeys.forEach((key) => {
-          queryClient.invalidateQueries({ queryKey: key });
-        });
+        await Promise.all(
+          invalidateKeys.map(
+            async (key) =>
+              await queryClient.invalidateQueries({ queryKey: key }),
+          ),
+        );
       }
       onSuccess?.(data);
     },

@@ -15,9 +15,9 @@ import type {
 
 export function useCodVerificationsQuery(params?: FetchCodVerificationsParams) {
   return useQuery({
-    queryKey: [
-      ...queryKeys.codVerifications.list(params as Record<string, unknown>),
-    ],
+    queryKey: queryKeys.codVerifications.list(
+      params as Record<string, unknown>,
+    ),
     queryFn: () => fetchCodVerifications(params),
   });
 }
@@ -29,10 +29,14 @@ export function useCodVerificationStatsQuery() {
   });
 }
 
-export function useSubmitCodVerification() {
+export function useSubmitCodVerification(id: string) {
   return useApiMutation<void, SubmitCodVerificationPayload>({
     mutationFn: submitCodVerification,
-    invalidateKeys: [[...queryKeys.codVerifications.all()]],
+    invalidateKeys: [
+      queryKeys.codVerifications.all(),
+      queryKeys.orders.all(),
+      queryKeys.orders.detail(id),
+    ],
     onSuccess: () => {
       toast.success("Verification submitted successfully");
     },

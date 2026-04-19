@@ -8,6 +8,7 @@ import {
   fetchOrderDetails,
   updateOrderStatus,
   validateAffiliateCodeAPI,
+  verifyOrder,
   fetchOrders,
   fetchOrderStats,
 } from "@/lib/api/orders";
@@ -15,6 +16,7 @@ import type {
   CreateOrderPayload,
   FetchOrdersParams,
   OrderDetailResponse,
+  VerifyOrderResponse,
 } from "@/lib/api/orders";
 import type { OrderFormData } from "@/lib/order-form-store";
 import { clearOrderFormDraft } from "@/lib/order-form-store";
@@ -23,7 +25,7 @@ import type { Order } from "@/lib/types";
 
 export function useOrdersQuery(params?: FetchOrdersParams) {
   return useQuery({
-    queryKey: [...queryKeys.orders.list(params as Record<string, unknown>)],
+    queryKey: queryKeys.orders.list(params as Record<string, unknown>),
     queryFn: () => fetchOrders(params),
   });
 }
@@ -44,6 +46,42 @@ export function useValidateAffiliateCode(code: string) {
   });
 }
 
+export function useVerifyOrder(data: OrderFormData | null) {
+  return useQuery<VerifyOrderResponse>({
+    queryKey: ["verify-order", data],
+    queryFn: async () => {
+      if (!data) throw new Error("No order data provided");
+
+      const payload: CreateOrderPayload = {
+        customerEmail: data.customerEmail,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        shippingAddress: data.shippingAddress,
+        billingAddress: data.sameAsShipping
+          ? data.shippingAddress
+          : data.billingAddress,
+        items: [
+          {
+            productId: data.productId,
+            quantity: data.quantity,
+          },
+        ],
+        paymentMethod: data.paymentMethod,
+        affiliateCode: data.affiliateCode || undefined,
+        notes: data.notes || undefined,
+        userId: data.customerId,
+        shippingAddressId: data.shippingAddressId,
+        billingAddressId: data.billingAddressId,
+        customerId: data.customerId,
+      };
+
+      return verifyOrder(payload);
+    },
+    enabled: !!data,
+    retry: false,
+  });
+}
+
 export function useCreateOrder() {
   const router = useRouter();
 
@@ -57,7 +95,12 @@ export function useCreateOrder() {
         billingAddress: data.sameAsShipping
           ? data.shippingAddress
           : data.billingAddress,
-        items: data.items,
+        items: [
+          {
+            productId: data.productId,
+            quantity: data.quantity,
+          },
+        ],
         paymentMethod: data.paymentMethod,
         affiliateCode: data.affiliateCode || undefined,
         notes: data.notes || undefined,
@@ -70,7 +113,7 @@ export function useCreateOrder() {
 
       return createOrder(payload);
     },
-    invalidateKeys: [[...queryKeys.orders.all()]],
+    invalidateKeys: [queryKeys.orders.all(), queryKeys.codVerifications.all()],
     onSuccess: (data) => {
       clearOrderFormDraft();
       toast.success("Order created successfully!");
@@ -88,7 +131,7 @@ export function useCreateOrder() {
 
 export function useOrderDetailQuery(id: string) {
   return useQuery({
-    queryKey: [...queryKeys.orders.detail(id)],
+    queryKey: queryKeys.orders.detail(id),
     queryFn: () => fetchOrderDetails(id),
     enabled: !!id,
   });
@@ -100,7 +143,7 @@ export function useUpdateOrderStatus() {
     { orderId: string; status: string }
   >({
     mutationFn: ({ orderId, status }) => updateOrderStatus(orderId, status),
-    invalidateKeys: [[...queryKeys.orders.all()]],
+    invalidateKeys: [queryKeys.orders.all()],
     onSuccess: () => {
       toast.success("Order status updated");
     },

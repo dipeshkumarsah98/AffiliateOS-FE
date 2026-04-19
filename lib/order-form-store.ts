@@ -9,11 +9,6 @@ export interface AddressInput {
   postal_code?: string;
 }
 
-export interface OrderItemInput {
-  productId: string;
-  quantity: number;
-}
-
 export interface OrderFormData {
   // Customer Information
   customerMode: "existing" | "new";
@@ -31,7 +26,8 @@ export interface OrderFormData {
   sameAsShipping: boolean;
 
   // Order Details
-  items: OrderItemInput[];
+  productId: string;
+  quantity: number;
   paymentMethod: "ESEWA" | "KHALTI" | "COD";
   affiliateCode?: string;
   notes?: string;
