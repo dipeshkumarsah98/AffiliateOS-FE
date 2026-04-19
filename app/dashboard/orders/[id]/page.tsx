@@ -153,7 +153,15 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="flex flex-row gap-2">
-                <Button variant="outline">Print Invoice</Button>
+                <Button variant="outline" asChild>
+                  <a
+                    href={`/dashboard/invoice/${params.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Preview Invoice
+                  </a>
+                </Button>
                 {canUpdateStatus && (
                   <Button onClick={() => setStatusDialogOpen(true)}>
                     Update Status

@@ -401,19 +401,6 @@ export default function ReviewOrderPage() {
                           </span>
                         </div>
                       )}
-
-                      {verifiedOrder.taxAmount > 0 && (
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">Tax</span>
-                          <span>
-                            {formatCurrency(
-                              verifiedOrder.taxAmount,
-                              verifiedOrder.currency,
-                            )}
-                          </span>
-                        </div>
-                      )}
-
                       {verifiedOrder.discountAmount > 0 && (
                         <div className="flex justify-between items-center text-sm">
                           <div className="flex items-center gap-1 text-green-600">
@@ -426,6 +413,19 @@ export default function ReviewOrderPage() {
                               verifiedOrder.discountAmount,
                               verifiedOrder.currency,
                             )}
+                          </span>
+                        </div>
+                      )}
+                      {verifiedOrder.taxAmount > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">
+                            Tax (13%){" "}
+                          </span>
+                          <span>
+                            {formatCurrency(
+                              verifiedOrder.taxAmount,
+                              verifiedOrder.currency,
+                            )}{" "}
                           </span>
                         </div>
                       )}
@@ -473,10 +473,7 @@ export default function ReviewOrderPage() {
                     ) : isVerifying ? (
                       "Verifying..."
                     ) : (
-                      <>
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Confirm & Create Order
-                      </>
+                      <>Confirm & Create Order</>
                     )}
                   </Button>
                 </CardFooter>
