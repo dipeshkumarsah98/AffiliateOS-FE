@@ -33,6 +33,22 @@ export interface UserSearchItem {
   addresses: UserAddress[];
 }
 
+export interface UserDetailAddress extends UserAddress {
+  userId: string;
+  createdAt: string;
+}
+
+export interface UserDetailResponse {
+  id: string;
+  email: string;
+  name?: string;
+  phone?: string;
+  roles: string[];
+  createdAt: string;
+  lastLogin?: string;
+  addresses: UserDetailAddress[];
+}
+
 export interface SearchUsersParams {
   search: string;
   page?: number;
@@ -49,6 +65,36 @@ export interface SearchUsersResponse {
   page: number;
   perPage: number;
   search: string;
+}
+
+// ── Create User types ───────────────────────────────────────────────────────
+
+export interface CreateUserAddress {
+  addressType: "shipping" | "billing";
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  isDefault: boolean;
+}
+
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  phone?: string;
+  roles: string[];
+  isActive: boolean;
+  addresses?: CreateUserAddress[];
+}
+
+export interface CreateUserResponse {
+  id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  roles: string[];
+  isActive: boolean;
+  createdAt: string;
 }
 
 // ── API Functions ───────────────────────────────────────────────────────────
@@ -72,5 +118,30 @@ export async function searchUsers(
       return searchParams.toString();
     },
   });
+  return data;
+}
+
+export async function getUserDetail(
+  userId: string,
+): Promise<UserDetailResponse> {
+  const { data } = await apiClient.get<UserDetailResponse>(`/users/${userId}`);
+  return data;
+}
+
+export async function createUser(
+  payload: CreateUserPayload,
+): Promise<CreateUserResponse> {
+  const { data } = await apiClient.post<CreateUserResponse>("/users", payload);
+  return data;
+}
+
+export async function updateUser(
+  userId: string,
+  payload: CreateUserPayload,
+): Promise<CreateUserResponse> {
+  const { data } = await apiClient.put<CreateUserResponse>(
+    `/users/${userId}`,
+    payload,
+  );
   return data;
 }

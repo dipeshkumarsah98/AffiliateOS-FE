@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { formatRelative, parseISO } from "date-fns";
 import {
   Users,
@@ -11,6 +12,7 @@ import {
   RefreshCw,
   ChevronDown,
   Eye,
+  Plus,
 } from "lucide-react";
 
 import { Topbar } from "@/components/layout/Topbar";
@@ -38,9 +40,22 @@ import RoleBadge from "@/components/common/RoleBadge";
 import UserAvatar from "@/components/common/UserAvatar";
 import { TablePagination } from "@/components/common/TablePagination";
 
+// Dynamic import for code splitting
+const UserDetailDialog = dynamic(
+  () =>
+    import("@/components/dashboard/users/UserDetailDialog").then(
+      (mod) => mod.UserDetailDialog,
+    ),
+  {
+    ssr: false,
+  },
+);
+
 const PAGE_SIZE = 20;
 
 export default function UserManagementPage() {
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentUser = useAuthStore((s) => s.currentUser);
@@ -177,8 +192,8 @@ export default function UserManagementPage() {
                 {isLoading ? "..." : `${total} user${total !== 1 ? "s" : ""}`}
               </p>
             </div>
-            <div className="flex items-center gap-3 flex-1 max-w-md">
-              <div className="flex-1 flex items-center gap-2 px-3.5 py-2 rounded-xl border-[#f1f5f9] bg-[#f8faff]">
+            <div className="flex items-center justify-end gap-3 flex-1 flex-wrap sm:flex-nowrap">
+              <div className="flex-1 flex items-center gap-2 px-3.5 py-2 rounded-xl border-[#f1f5f9] bg-[#f8faff] min-w-[200px] max-w-sm">
                 <Search
                   className="w-4 h-4 shrink-0"
                   style={{ color: "#9ca3af" }}
@@ -216,6 +231,14 @@ export default function UserManagementPage() {
                   style={{ color: "#9ca3af" }}
                 />
               </div>
+
+              <Button
+                onClick={() => router.push("/dashboard/users/new")}
+                className="gap-2 rounded-xl bg-[#2b4bb9] hover:bg-[#203a93]"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add User</span>
+              </Button>
             </div>
           </div>
 
@@ -363,9 +386,7 @@ export default function UserManagementPage() {
                           size="sm"
                           className="flex h-auto items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[#eef2ff]"
                           style={{ color: "#2b4bb9" }}
-                          onClick={() => {
-                            toast.info("View user details coming soon.");
-                          }}
+                          onClick={() => setSelectedUserId(u.id)}
                         >
                           <Eye className="w-3.5 h-3.5" />
                           View
@@ -389,6 +410,11 @@ export default function UserManagementPage() {
           )}
         </Card>
       </div>
+
+      <UserDetailDialog
+        userId={selectedUserId}
+        onClose={() => setSelectedUserId(null)}
+      />
     </div>
   );
 }

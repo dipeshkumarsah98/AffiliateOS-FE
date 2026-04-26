@@ -18,7 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Topbar } from "@/components/layout/Topbar";
 import { loadOrderFormDraft, type OrderFormData } from "@/lib/order-form-store";
 import { useCreateOrder, useVerifyOrder } from "@/hooks/use-orders";
-import { useProductsQuery } from "@/hooks/use-products";
 import { formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
