@@ -11,7 +11,7 @@ import type {
 export const DUMMY_USERS: User[] = [
   {
     id: "u1",
-    email: "admin@affiliateos.com",
+    email: "admin@khatriin.com",
     roles: ["admin"],
     name: "Alex Morgan",
   },

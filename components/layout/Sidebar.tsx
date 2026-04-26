@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -12,7 +13,6 @@ import {
   DollarSign,
   ShieldCheck,
   User,
-  Layers,
   X,
   Banknote,
 } from "lucide-react";
@@ -98,13 +98,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <div className="flex flex-col h-full">
       <div className="px-6 py-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{
-              background: "linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)",
-            }}
-          >
-            <Layers className="w-4 h-4 text-white" />
+          <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+            <Image
+              src="/logo.png"
+              alt="Khatriin Logo"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
           <div>
             <p
@@ -115,7 +116,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 letterSpacing: "-0.02em",
               }}
             >
-              AffiliateOS
+              Khatriin
             </p>
             <p
               className="text-[10px]"
@@ -158,7 +159,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 isActive
                   ? {
                       background:
-                        "linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)",
+                        "linear-gradient(135deg, #D60B47 0%, #e63468 100%)",
                       color: "white",
                     }
                   : { color: "var(--on-surface-variant)" }
@@ -197,7 +198,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 isActive
                   ? {
                       background:
-                        "linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)",
+                        "linear-gradient(135deg, #D60B47 0%, #e63468 100%)",
                       color: "white",
                     }
                   : { color: "var(--on-surface-variant)" }

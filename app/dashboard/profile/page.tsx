@@ -2,8 +2,9 @@
 
 import { useAuthStore } from '@/stores/auth-store'
 import { Topbar } from '@/components/layout/Topbar'
-import { LogOut, Mail, ShieldCheck, User, CalendarDays, Layers } from 'lucide-react'
+import { LogOut, Mail, ShieldCheck, User, CalendarDays } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function ProfilePage() {
   const currentUser = useAuthStore((s) => s.currentUser)
@@ -49,7 +50,7 @@ export default function ProfilePage() {
             {/* Gradient banner */}
             <div
               className="h-24"
-              style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 60%, #6a84e8 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #D60B47 0%, #e63468 60%, #f96694 100%)' }}
             />
 
             {/* Avatar row */}
@@ -60,7 +61,7 @@ export default function ProfilePage() {
                   style={{
                     width: '72px',
                     height: '72px',
-                    background: 'linear-gradient(135deg, #1e3a9f 0%, #3d56c4 100%)',
+                    background: 'linear-gradient(135deg, #b9093c 0%, #d02a57 100%)',
                     color: '#fff',
                     borderColor: '#fff',
                     fontFamily: 'var(--font-display)',
@@ -90,9 +91,9 @@ export default function ProfilePage() {
               <div key={label} className="flex items-center gap-4 px-7 py-4">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: '#eef2ff' }}
+                  style={{ background: '#ffe4ec' }}
                 >
-                  <Icon className="w-4 h-4" style={{ color: '#2b4bb9' }} />
+                  <Icon className="w-4 h-4" style={{ color: '#D60B47' }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#9ca3af' }}>{label}</p>
@@ -107,14 +108,11 @@ export default function ProfilePage() {
             className="rounded-2xl px-7 py-4 flex items-center gap-3"
             style={{ background: '#fff', boxShadow: '0 2px 16px rgba(19,27,46,0.06)' }}
           >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
-            >
-              <Layers className="w-4 h-4 text-white" />
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+              <Image src="/logo.png" alt="Khatriin Logo" fill className="object-contain" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold" style={{ color: '#0f172a' }}>AffiliateOS</p>
+              <p className="text-sm font-semibold" style={{ color: '#0f172a' }}>Khatriin</p>
               <p className="text-xs" style={{ color: '#9ca3af' }}>v1.0.0 — Order Tracking System</p>
             </div>
           </div>
@@ -125,7 +123,7 @@ export default function ProfilePage() {
             style={{ background: '#fff1f2', color: '#be123c' }}
           >
             <LogOut className="w-4 h-4" />
-            Sign out of AffiliateOS
+            Sign out of Khatriin
           </button>
 
         </div>

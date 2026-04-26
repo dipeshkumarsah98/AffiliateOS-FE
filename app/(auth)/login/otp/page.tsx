@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { useAuthStore } from '@/stores/auth-store'
 import { useSendOtpMutation, useVerifyOtpMutation } from '@/hooks/use-auth'
 import { getApiErrorMessage } from '@/lib/api/client'
-import { Layers, ArrowRight, RefreshCw, ChevronLeft, CheckCircle2, Zap, Shield } from 'lucide-react'
+import { ArrowRight, RefreshCw, ChevronLeft, CheckCircle2, Zap, Shield } from 'lucide-react'
 import Link from 'next/link'
 
 export default function OtpPage() {
@@ -96,7 +97,7 @@ export default function OtpPage() {
       {/* Left panel — branding (identical to login page) */}
       <div
         className="hidden lg:flex lg:w-[52%] flex-col justify-between p-12 relative overflow-hidden"
-        style={{ background: 'linear-gradient(145deg, #1a3299 0%, #2b4bb9 40%, #4865d3 100%)' }}
+        style={{ background: 'linear-gradient(145deg, #9a0832 0%, #D60B47 40%, #e63468 100%)' }}
       >
         {/* Background texture */}
         <div className="absolute inset-0 opacity-10" style={{
@@ -104,13 +105,12 @@ export default function OtpPage() {
         }} />
 
         {/* Logo */}
-        <div className="relative flex items-center gap-3 z-10">
-          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-            <Layers className="w-5 h-5 text-white" />
+        <div className="relative flex items-center z-10">
+          <div className="relative w-32 h-32 rounded-2xl bg-white/95 backdrop-blur-sm flex items-center justify-center p-4 shadow-lg">
+            <div className="relative w-full h-full">
+              <Image src="/logo.png" alt="Khatriin Logo" fill className="object-contain" priority />
+            </div>
           </div>
-          <span className="text-white font-bold text-xl" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>
-            AffiliateOS
-          </span>
         </div>
 
         {/* Main copy */}
@@ -118,9 +118,9 @@ export default function OtpPage() {
           <div>
             <h2 className="text-5xl font-bold text-white leading-tight mb-4" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.03em' }}>
               Track every order.<br />
-              <span className="text-blue-200">Earn every commission.</span>
+              <span className="text-pink-200">Earn every commission.</span>
             </h2>
-            <p className="text-blue-100 text-lg leading-relaxed max-w-sm">
+            <p className="text-pink-100 text-lg leading-relaxed max-w-sm">
               The affiliate e-commerce intelligence platform built for vendors who demand precision.
             </p>
           </div>
@@ -136,7 +136,7 @@ export default function OtpPage() {
                 <div className="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
                   <f.icon className="w-3.5 h-3.5 text-white" />
                 </div>
-                <span className="text-blue-100 text-sm">{f.text}</span>
+                <span className="text-pink-100 text-sm">{f.text}</span>
               </div>
             ))}
           </div>
@@ -151,7 +151,7 @@ export default function OtpPage() {
           ].map((s) => (
             <div key={s.label}>
               <p className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>{s.value}</p>
-              <p className="text-xs text-blue-200 mt-0.5">{s.label}</p>
+              <p className="text-xs text-pink-200 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -161,14 +161,12 @@ export default function OtpPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
-            >
-              <Layers className="w-4 h-4 text-white" />
+          <div className="lg:hidden flex justify-center mb-8">
+            <div className="relative w-24 h-24 rounded-xl bg-white shadow-md flex items-center justify-center p-3">
+              <div className="relative w-full h-full">
+                <Image src="/logo.png" alt="Khatriin Logo" fill className="object-contain" priority />
+              </div>
             </div>
-            <span className="font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--on-surface)' }}>AffiliateOS</span>
           </div>
 
           {/* Back link */}
@@ -216,7 +214,7 @@ export default function OtpPage() {
                       border: error ? '2px solid var(--error)' : digit ? '2px solid var(--primary)' : '2px solid transparent',
                     }}
                     onFocus={e => {
-                      if (!error) e.currentTarget.style.border = '2px solid rgba(43,75,185,0.4)'
+                      if (!error) e.currentTarget.style.border = '2px solid rgba(214,11,71,0.4)'
                       e.currentTarget.style.background = 'var(--surface-container-lowest)'
                     }}
                     onBlur={e => {
@@ -237,7 +235,7 @@ export default function OtpPage() {
               type="submit"
               disabled={verifyOtpMutation.isPending || otp.join('').length < 6}
               className="w-full py-3 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg, #2b4bb9 0%, #4865d3 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #D60B47 0%, #e63468 100%)' }}
             >
               {verifyOtpMutation.isPending ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

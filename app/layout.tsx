@@ -17,7 +17,7 @@ const manrope = Manrope({
 })
 
 export const metadata: Metadata = {
-  title: 'AffiliateOS — Order Tracking Dashboard',
+  title: 'Khatriin — Order Tracking Dashboard',
   description: 'Production-ready affiliate e-commerce order tracking system with role-based access for admins and vendors.',
   generator: 'v0.app',
 }
